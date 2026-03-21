@@ -46,21 +46,40 @@ var Otpstorage = make(map[string]record)
 
 // funcitn that save and delate otp automaticly
 
-func otpsaveanddelate(otp string) {
+func otpsaveanddelate(otp string, user string) record {
 
 	newotp := record{
 		Code:         otp,
 		Codesavetime: time.Now(),
 	}
 
-	Otpstorage["mikey"] = newotp
+	Otpstorage[user] = newotp
 
 	go func() {
 
 		time.Sleep(15 * time.Second)
-		delete(Otpstorage, "mikey")
+		delete(Otpstorage, user)
+		fmt.Printf(" \n The otp is expired ! ")
 
 	}()
+
+	return newotp
+
+}
+
+// otp verify
+
+func optverify(w http.ResponseWriter , r *http.Request) {
+
+	var imcamingotp struct {
+		Otp string `json:"otp"`
+	}
+
+	json.NewDecoder(r.Body).Decode(&imcamingotp)
+
+	fmt.Printf(" %v ", imcamingotp)
+	fmt.Printf(" \n hello \n ")
+
 }
 
 // json file read
@@ -192,8 +211,6 @@ func register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, " \n Signup page is active <3 \n")
-
 	var incamingdats struct {
 		Email    string `json:"email"`
 		Username string `json:"username"`
@@ -218,20 +235,22 @@ func register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	validemail := true
-	otpone := true
 
 	if validemail {
 
-		if otpone {
+		fmt.Fprintf(w, "otpsented")
 
-			_, err := jsondatasave(incamingdats.Email, incamingdats.Username, incamingdats.Password)
+		// otpdone := optverify(user.otp)
 
-			if err != nil {
+		// if otpdone {
 
-				fmt.Printf("error : %v ", err)
-			}
+		// 	_, err := jsondatasave(incamingdats.Email, incamingdats.Username, incamingdats.Password)
 
-		}
+		// 	if err != nil {
+		// 		fmt.Printf("loging conform")
+		// 	}
+
+		// }
 
 	}
 
@@ -281,6 +300,7 @@ func main() {
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/signup", register)
 	http.HandleFunc("/forgetpass", forgetpass)
+	http.HandleFunc("/otp", optverify )
 
 	// http.HandleFunc("/chat-init" , long)
 

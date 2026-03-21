@@ -33,15 +33,12 @@ func login(url string, username string, password string) {
 		fmt.Printf(" \n sucessfully sented : ", resp.Status)
 	}
 
-
 	defer resp.Body.Close()
 
-	bodybytes, _:=io.ReadAll(resp.Body)
+	bodybytes, _ := io.ReadAll(resp.Body)
 	massage := string(bodybytes)
 
 	fmt.Printf(massage)
-
-
 
 }
 
@@ -74,6 +71,42 @@ func register(url string, email string, username string, password string) {
 	}
 
 	defer resp.Body.Close()
+
+	bodybyte, _ := io.ReadAll(resp.Body)
+
+	masssage := string(bodybyte)
+
+	if masssage == "otpsented" {
+		fmt.Printf("\n otpsented \n")
+		var userinput string
+		fmt.Scan(&userinput)
+
+		otpdata := map[string]string{
+
+			"otp": userinput,
+		}
+
+		jsonopt, _ := json.Marshal(otpdata)
+
+		otpreplay, err := http.Post("http://localhost:4040/otp", "/appicaltion/data", bytes.NewBuffer(jsonopt))
+
+		if err != nil {
+			fmt.Printf(" faild to sent otp ", err)
+		}
+
+		defer otpreplay.Body.Close()
+
+		replaybytes, _ := io.ReadAll(otpreplay.Body)
+		replayofotp := string(replaybytes)
+
+		if replayofotp == "success" {
+			fmt.Printf("successfully register ")
+		} else {
+			fmt.Printf(" top not match")
+			return
+		}
+
+	}
 
 }
 
