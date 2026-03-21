@@ -1,10 +1,13 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -16,6 +19,48 @@ type user struct {
 	Email    string `json:"email"`
 	Token    string `json:"token"`
 	Password string `json:"passowrd"`
+}
+
+// otp genaretor
+
+func generateOTP() string {
+
+	b := make([]byte, 2)
+
+	rand.Read(b)
+
+	newNumber := binary.BigEndian.Uint16(b)
+
+	return fmt.Sprintf("%04d", newNumber%10000)
+
+}
+
+// otp save
+
+type record struct {
+	Code         string
+	Codesavetime time.Time
+}
+
+var Otpstorage = make(map[string]record)
+
+// funcitn that save and delate otp automaticly
+
+func otpsaveanddelate(otp string) {
+
+	newotp := record{
+		Code:         otp,
+		Codesavetime: time.Now(),
+	}
+
+	Otpstorage["mikey"] = newotp
+
+	go func() {
+
+		time.Sleep(15 * time.Second)
+		delete(Otpstorage, "mikey")
+
+	}()
 }
 
 // json file read
@@ -87,7 +132,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path != "/login" {
 
-		fmt.Printf(" login page faild ! : %s ", http.StatusNotFound)
+		fmt.Printf(" login page faild ! : %v ", http.StatusNotFound)
 		return
 	}
 
@@ -143,7 +188,7 @@ func register(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path != "/signup" {
 
-		fmt.Printf(" signup page faild : %s ", http.StatusNotFound)
+		fmt.Printf(" signup page faild : %v ", http.StatusNotFound)
 		return
 	}
 
@@ -179,11 +224,11 @@ func register(w http.ResponseWriter, r *http.Request) {
 
 		if otpone {
 
-			_, err := jsondatasave( incamingdats.Email , incamingdats.Username , incamingdats.Password )
+			_, err := jsondatasave(incamingdats.Email, incamingdats.Username, incamingdats.Password)
 
 			if err != nil {
 
-				fmt.Printf("error : ", err)
+				fmt.Printf("error : %v ", err)
 			}
 
 		}

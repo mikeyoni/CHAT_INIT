@@ -3,8 +3,8 @@ package main
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"time"
 	"fmt"
+	"time"
 )
 
 func generateOTP() string {
@@ -20,13 +20,11 @@ func generateOTP() string {
 }
 
 type record struct {
-	Code       string
+	Code      string
 	Createdat time.Time
 }
 
 var otpstorage = make(map[string]record)
-
-
 
 func main() {
 
@@ -35,7 +33,7 @@ func main() {
 	otp := generateOTP()
 
 	newentry := record{
-		Code: otp,
+		Code:      otp,
 		Createdat: time.Now(),
 	}
 
@@ -43,12 +41,29 @@ func main() {
 
 	fmt.Printf(" %s \n", otp)
 
-	fmt.Printf(" %s is the otp and its created on %v " , otpstorage["mikey"].Code , otpstorage["mikey"].Createdat)
+	fmt.Printf(" %s is the otp and its created on %v ", otpstorage["mikey"].Code, otpstorage["mikey"].Createdat)
 
+	go func() {
 
+		time.Sleep(15 * time.Second)
+		delete(otpstorage, "mikey")
+		fmt.Printf(" \n the stored otp is delated ! ")
+	}()
 
+	for {
+		// 1. The "comma, ok" check: 'exists' is a boolean (true/false)
+		record, exists := otpstorage["mikey"]
 
+		if !exists {
+			fmt.Println("\n[LOOP] The record is gone! Breaking out.")
+			break
+		}
 
+		// 2. Just to show it's working
+		fmt.Printf("\rChecking... OTP %s is still in RAM", record.Code)
 
+		// 3. ESSENTIAL: Give the CPU a 1-second break
+		time.Sleep(1 * time.Second)
+	}
 
 }
