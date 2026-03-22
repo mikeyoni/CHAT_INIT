@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
+	"net/smtp"
 	"time"
 )
 
@@ -26,11 +27,48 @@ type record struct {
 
 var otpstorage = make(map[string]record)
 
+// EMAIL SEINGING SYSTREAWM
+
+func sentOPTEmail(targetEmail string, otp string) error {
+
+	form := "uimikey1@gmail.com"
+	password := "kygcvtcqcyjwxebl"
+
+	// setup smtp server settings for gmail
+	smtpHost := "smtp.gmail.com"
+	smtpPort := "587"
+
+	// create massage
+
+	subject := "Subject: Pirate King Verification Code\r\n"
+
+	fromHeader := "From: uimikey1@gmail.com\r\n"
+	toHeader := fmt.Sprintf("To: %s\r\n", targetEmail)
+	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+
+	body := fmt.Sprintf("<html><body><h1>Your Code: %s</h1><p>Expires in 60 seconds.</p></body></html>", otp)
+	message := []byte(subject + fromHeader + toHeader + mime + body)
+	// authentication
+	auth := smtp.PlainAuth("", form, password, smtpHost)
+
+	// sending the actual emaiil
+
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, form, []string{targetEmail}, message)
+	
+	if err != nil {
+		return err
+	}
+	return nil
+
+}
+
 func main() {
 
 	fmt.Printf("hllo \n")
 
 	otp := generateOTP()
+
+	sentOPTEmail("mda891526@gmail.com", otp)
 
 	newentry := record{
 		Code:      otp,

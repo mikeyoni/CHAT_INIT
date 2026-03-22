@@ -5,11 +5,16 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"net/smtp"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/joho/godotenv"
 )
 
 // structure of the json data base
@@ -35,6 +40,18 @@ func generateOTP() string {
 
 }
 
+// valid email
+
+func isEmailValid(e string) bool {
+	// This is the standard Regex for email addresses
+	emailRegex := regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
+
+	// Convert to lowercase first (Fedora/Linux style)
+	e = strings.ToLower(strings.TrimSpace(e))
+
+	return emailRegex.MatchString(e)
+}
+
 // otp save
 
 type record struct {
@@ -57,7 +74,7 @@ func otpsaveanddelate(otp string, user string) record {
 
 	go func() {
 
-		time.Sleep(15 * time.Second)
+		time.Sleep(2 * time.Minute)
 		delete(Otpstorage, user)
 		fmt.Printf(" \n The otp is expired ! ")
 
@@ -67,18 +84,53 @@ func otpsaveanddelate(otp string, user string) record {
 
 }
 
-// otp verify
+// otp sender
 
-func optverify(w http.ResponseWriter , r *http.Request) {
+func init() {
 
-	var imcamingotp struct {
-		Otp string `json:"otp"`
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
 	}
+}
 
-	json.NewDecoder(r.Body).Decode(&imcamingotp)
+func sentOPTEmail(targetEmail string, otp string) error {
 
-	fmt.Printf(" %v ", imcamingotp)
-	fmt.Printf(" \n hello \n ")
+	validemail := isEmailValid(targetEmail)
+
+	if !validemail {
+		fmt.Printf(" \n invalid email \n ")
+		return nil
+	}
+	
+	form := "uimikey1@gmail.com"
+	password := os.Getenv("pass")
+
+	// setup smtp server settings for gmail
+	smtpHost := "smtp.gmail.com"
+	smtpPort := "587"
+
+	// create massage
+
+	subject := "Subject: Pirate King Verification Code\r\n"
+
+	fromHeader := "From: uimikey1@gmail.com\r\n"
+	toHeader := fmt.Sprintf("To: %s\r\n", targetEmail)
+	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
+
+	body := fmt.Sprintf("<html><body><h1>Your Code: %s</h1><p>Expires in 60 seconds.</p></body></html>", otp)
+	message := []byte(subject + fromHeader + toHeader + mime + body)
+	// authentication
+	auth := smtp.PlainAuth("", form, password, smtpHost)
+
+	// sending the actual emaiil
+
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, form, []string{targetEmail}, message)
+
+	if err != nil {
+		return err
+	}
+	return nil
 
 }
 
@@ -202,8 +254,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 // this is register function
-
-func register(w http.ResponseWriter, r *http.Request) {
+func checkup(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path != "/signup" {
 
@@ -214,7 +265,6 @@ func register(w http.ResponseWriter, r *http.Request) {
 	var incamingdats struct {
 		Email    string `json:"email"`
 		Username string `json:"username"`
-		Password string `json:"password"`
 	}
 
 	json.NewDecoder(r.Body).Decode(&incamingdats)
@@ -234,28 +284,63 @@ func register(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	validemail := true
+	otp := generateOTP()
 
-	if validemail {
+	email := incamingdats.Email
 
-		fmt.Fprintf(w, "otpsented")
+	sentOPTEmail(email, otp)
 
-		// otpdone := optverify(user.otp)
+	otpsaveanddelate(otp, incamingdats.Username)
 
-		// if otpdone {
+	fmt.Fprintf(w, "success")
 
-		// 	_, err := jsondatasave(incamingdats.Email, incamingdats.Username, incamingdats.Password)
+}
 
-		// 	if err != nil {
-		// 		fmt.Printf("loging conform")
-		// 	}
-
-		// }
-
+func register(w http.ResponseWriter, r *http.Request) {
+	// 1. Always check the Method (Safety first!)
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	fmt.Printf(" %+v ", incamingdats)
+	var incoming struct {
+		Email    string `json:"email"`
+		Username string `json:"username"`
+		Password string `json:"password"`
+		Otp      string `json:"otp"`
+	}
 
+	// 2. Check if the Decoding actually worked
+	err := json.NewDecoder(r.Body).Decode(&incoming)
+	if err != nil {
+		fmt.Printf("JSON Decode Error: %v\n", err)
+		return
+	}
+
+	// 3. Debug Print: See what the Ryzen 5600G is actually seeing
+	fmt.Printf("Received: User=%s, Email=%s, OTP=%s\n", incoming.Username, incoming.Email, incoming.Otp)
+
+	// ... (Your existing user-exists loop) ...
+
+	savedata := Otpstorage[incoming.Username]
+
+	// 4. THE FIX: Only save if the OTP matches!
+	if savedata.Code != "" && savedata.Code == incoming.Otp {
+		fmt.Printf("\n[SUCCESS] OTP Matched for %s\n", incoming.Username)
+
+		_, err := jsondatasave(incoming.Email, incoming.Username, incoming.Password)
+		if err != nil {
+			fmt.Printf("Save Error: %v\n", err)
+			fmt.Fprintf(w, "save_error")
+			return
+		}
+
+		fmt.Fprintf(w, "success")
+		delete(Otpstorage, incoming.Username) // Clean up the RAM
+	} else {
+		fmt.Printf("[FAIL] OTP Mismatch. Got: %s, Expected: %s\n", incoming.Otp, savedata.Code)
+		fmt.Fprintf(w, "top not match")
+	}
 }
 
 // this is forget password email capture
@@ -298,9 +383,9 @@ func main() {
 	// this are the main functin that canect logical funcion to the url quaris
 
 	http.HandleFunc("/login", login)
-	http.HandleFunc("/signup", register)
+	http.HandleFunc("/signup", checkup)
+	http.HandleFunc("/confarmregister", register)
 	http.HandleFunc("/forgetpass", forgetpass)
-	http.HandleFunc("/otp", optverify )
 
 	// http.HandleFunc("/chat-init" , long)
 

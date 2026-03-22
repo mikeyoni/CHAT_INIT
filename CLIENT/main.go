@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	// "encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	// "golang.org/x/tools/go/analysis/checker"
 	// "net/url"
 	// "net/http"
 )
@@ -44,13 +46,12 @@ func login(url string, username string, password string) {
 
 // this is register function this do post register info to the srever in json form
 
-func register(url string, email string, username string, password string) {
+func emailcheck(url string, email string, username string, password string) {
 
 	data := map[string]string{
 
 		"email":    email,
 		"username": username,
-		"password": password,
 	}
 
 	jsondata, err := json.Marshal(data)
@@ -72,41 +73,51 @@ func register(url string, email string, username string, password string) {
 
 	defer resp.Body.Close()
 
-	bodybyte, _ := io.ReadAll(resp.Body)
+	newbytes, _ := io.ReadAll(resp.Body)
 
-	masssage := string(bodybyte)
+	massage := string(newbytes)
 
-	if masssage == "otpsented" {
-		fmt.Printf("\n otpsented \n")
-		var userinput string
-		fmt.Scan(&userinput)
+	if massage == "success" {
+		register("http://localhost:4040/confarmregister", email, username, password)
+	}
 
-		otpdata := map[string]string{
+}
 
-			"otp": userinput,
-		}
+func register(url string, email string, username string, password string) {
 
-		jsonopt, _ := json.Marshal(otpdata)
+	var userinput string
+	fmt.Printf(" \n Enter the otp : ")
+	fmt.Scan(&userinput)
 
-		otpreplay, err := http.Post("http://localhost:4040/otp", "/appicaltion/data", bytes.NewBuffer(jsonopt))
+	data := map[string]string{
 
-		if err != nil {
-			fmt.Printf(" faild to sent otp ", err)
-		}
+		"email":    email,
+		"username": username,
+		"password": password,
+		"otp":      userinput,
+	}
 
-		defer otpreplay.Body.Close()
+	jsondata, err := json.Marshal(data)
+	if err != nil {
 
-		replaybytes, _ := io.ReadAll(otpreplay.Body)
-		replayofotp := string(replaybytes)
+		fmt.Printf(" \n faild to marshel json data : ", err)
+		return
+	}
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsondata))
 
-		if replayofotp == "success" {
-			fmt.Printf("successfully register ")
-		} else {
-			fmt.Printf(" top not match")
-			return
-		}
+	if err != nil {
+		fmt.Printf(" \n failt to post register info : ", err)
+		return
+	} else {
+
+		fmt.Printf(" \n successfuly posted register data : ", err)
 
 	}
+
+	defer resp.Body.Close()
+
+	newbystes, _ := io.ReadAll(resp.Body)
+	fmt.Printf("\n [SERVER RESPONSE]: %s\n", string(newbystes))
 
 }
 
@@ -144,8 +155,8 @@ func forgetpass(url string, email string) {
 
 func main() {
 
-	login("http://localhost:4040/login", "mikey", "mikey")
-	register("http://localhost:4040/signup", "mda234343@gmail.com", "dra34ken", "paf32453")
+	// login("http://localhost:4040/login", "mikey", "mikey")
+	emailcheck("http://localhost:4040/signup", "uimikey78@gmail.com", "dra34ken", "paf32453")
 	// forgetpass("http://localhost:4040/forgetpass", "mda35345345@gmail.com")
 
 }
