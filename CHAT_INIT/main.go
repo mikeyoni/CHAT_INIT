@@ -102,7 +102,7 @@ func sentOPTEmail(targetEmail string, otp string) error {
 		fmt.Printf(" \n invalid email \n ")
 		return nil
 	}
-	
+
 	form := "uimikey1@gmail.com"
 	password := os.Getenv("pass")
 
@@ -133,6 +133,8 @@ func sentOPTEmail(targetEmail string, otp string) error {
 	return nil
 
 }
+
+// done
 
 // json file read
 
