@@ -134,8 +134,6 @@ func sentOPTEmail(targetEmail string, otp string) error {
 
 }
 
-// done
-
 // json file read
 
 func jsonreade() ([]user, error) {
