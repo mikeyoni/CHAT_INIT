@@ -15,7 +15,18 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/joho/godotenv"
+	"golang.org/x/crypto/bcrypt"
 )
+
+func Hashpassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 10)
+	return string(bytes), err
+}
+
+func Compareshass(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
 
 // structure of the json data base
 
@@ -172,11 +183,11 @@ func jsondatasave(email string, username string, password string) ([]user, error
 	}
 
 	// fmt.Printf("%+v",jsondata)
-
+	hashpass, _ := Hashpassword(password)
 	newuser := user{
 		Email:    email,
 		UserName: username,
-		Password: password,
+		Password: hashpass,
 	}
 
 	jsondata = append(jsondata, newuser)
@@ -207,7 +218,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Fprintf(w, "\n Login page is active \n")
 
 	var incamingdata struct {
 		Username string `json:"username"`
@@ -230,12 +240,8 @@ func login(w http.ResponseWriter, r *http.Request) {
 		if user.UserName == incamingdata.Username {
 
 			userfound = true
-			if user.Password == incamingdata.Password {
-
-				passwordfund = true
-				break
-
-			}
+			passwordfund = Compareshass(incamingdata.Password, user.Password)
+			break
 
 		}
 
