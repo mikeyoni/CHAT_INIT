@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -11,11 +12,22 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
+	
+)
+
+var (
+	upgrader = websocket.Upgrader{ReadBufferSize: 2040,
+		WriteBufferSize: 2040, CheckOrigin: func(r *http.Request) bool { return true }}
+
+	client   = make(map[string]*websocket.Conn)
+	clientMu sync.Mutex
 )
 
 func Hashpassword(password string) (string, error) {
@@ -184,10 +196,13 @@ func jsondatasave(email string, username string, password string) ([]user, error
 
 	// fmt.Printf("%+v",jsondata)
 	hashpass, _ := Hashpassword(password)
+	token := dcstyletokengen(username, email, hashpass)
+
 	newuser := user{
 		Email:    email,
 		UserName: username,
 		Password: hashpass,
+		Token:    token,
 	}
 
 	jsondata = append(jsondata, newuser)
@@ -218,7 +233,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	var incamingdata struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -241,6 +255,11 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 			userfound = true
 			passwordfund = Compareshass(incamingdata.Password, user.Password)
+			if passwordfund {
+				usertoke := user.Token
+				fmt.Fprintf(w, "success:token:%s", usertoke)
+			}
+
 			break
 
 		}
@@ -251,8 +270,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, " user not found ")
 	} else if !passwordfund {
 		fmt.Fprintf(w, " passsowrd not found ")
-	} else {
-		fmt.Fprintf(w, " logig success ")
 	}
 
 	fmt.Printf(" %+v ", incamingdata)
@@ -341,7 +358,17 @@ func register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		fmt.Fprintf(w, "success")
+		usersdata, _ := jsonreade()
+
+		for _, userdatas := range usersdata {
+
+			if userdatas.UserName == incoming.Username {
+
+				fmt.Fprintf(w, "success:token:%s", userdatas.Token)
+
+			}
+		}
+
 		delete(Otpstorage, incoming.Username) // Clean up the RAM
 	} else {
 		fmt.Printf("[FAIL] OTP Mismatch. Got: %s, Expected: %s\n", incoming.Otp, savedata.Code)
@@ -371,6 +398,93 @@ func forgetpass(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func dcstyletokengen(username string, email string, password string) string {
+
+	hashpass := password[len(password)-10:]
+
+	rowtoken := fmt.Sprintf("%s:%s:%s", username, email, hashpass)
+
+	return base64.StdEncoding.EncodeToString([]byte(rowtoken))
+
+}
+
+func chating(w http.ResponseWriter, r *http.Request) {
+
+	username := r.URL.Query().Get("user")
+	token := r.URL.Query().Get("token")
+
+	if username == "" || token == "" {
+
+		fmt.Fprintf(w, "\n user info misisng \n ")
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+
+	if err != nil {
+		return
+	}
+
+	clientMu.Lock()
+	client[username] = conn
+	clientMu.Unlock()
+
+	fmt.Printf(" \n %s has cannected the server : \n" , username )
+
+	defer func() {
+
+		clientMu.Lock()
+		fmt.Printf(" %s has left form canection ", username)
+		delete(client, username)
+		clientMu.Unlock()
+
+	}()
+
+	for {
+
+		_, p, err := conn.ReadMessage()
+
+		if err != nil {
+			break
+		}
+
+		row := string(p)
+		if strings.HasPrefix(row, "tusr:") {
+			parts := strings.SplitN(row, ":" , 4)
+			
+			if len(parts) >= 0 && parts[3] != "" {
+				
+				message := fmt.Sprintf(" [ %s ] : %s ", username, parts[3])
+				sendto(parts[1], message)
+			}
+		}
+
+	}
+
+}
+
+func sendto(tusr string, msg string) {
+
+	clientMu.Lock()
+	defer clientMu.Unlock()
+
+	target, ok := client[tusr]
+
+	if !ok {
+		fmt.Printf("\n the user is offline \n ")
+		return
+	}
+
+	err := target.WriteMessage(websocket.TextMessage, []byte(msg))
+
+	if err != nil {
+		fmt.Printf("\n cannection problem : %s ", &err)
+
+		target.Close()
+		delete(client, tusr)
+	}
+
+}
+
 func main() {
 
 	// jsondata, err := jsonreade()
@@ -392,6 +506,7 @@ func main() {
 	http.HandleFunc("/signup", checkup)
 	http.HandleFunc("/confarmregister", register)
 	http.HandleFunc("/forgetpass", forgetpass)
+	http.HandleFunc("/chat" , chating)
 
 	// http.HandleFunc("/chat-init" , long)
 
