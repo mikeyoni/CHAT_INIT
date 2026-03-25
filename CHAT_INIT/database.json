@@ -3,18 +3,24 @@
 		"username": "mikey",
 		"email": "mda2342@gmail.com",
 		"token": "",
-		"passowrd": "mikey"
+		"passowrd": "mikey",
+		"friendlist": null
 	},
 	{
 		"username": "dra34ken",
 		"email": "uimikey78@gmail.com",
 		"token": "ZHJhMzRrZW46dWltaWtleTc4QGdtYWlsLmNvbTpTai9PdmdZTy5h",
-		"passowrd": "$2a$10$pOv1GRDs2Q04luRVskN.kOeENwkyStoYuyyBbgrsWOWSj/OvgYO.a"
+		"passowrd": "$2a$10$pOv1GRDs2Q04luRVskN.kOeENwkyStoYuyyBbgrsWOWSj/OvgYO.a",
+		"friendlist": [
+			"mikey2",
+			"mikey3"
+		]
 	},
 	{
 		"username": "mikey2",
 		"email": "mda891526@gmail.com",
 		"token": "bWlrZXkyOm1kYTg5MTUyNkBnbWFpbC5jb206VGFUVWdOdk0xMg==",
-		"passowrd": "$2a$10$5QwaRTva6Etx1JjvchvabeJ/MclZaeiFgFQowW3sTTdTaTUgNvM12"
+		"passowrd": "$2a$10$5QwaRTva6Etx1JjvchvabeJ/MclZaeiFgFQowW3sTTdTaTUgNvM12",
+		"friendlist": null
 	}
 ]
