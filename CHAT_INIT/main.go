@@ -11,6 +11,7 @@ import (
 	"net/smtp"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -19,7 +20,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
-	
 )
 
 var (
@@ -43,10 +43,12 @@ func Compareshass(password, hash string) bool {
 // structure of the json data base
 
 type user struct {
-	UserName string `json:"username"`
-	Email    string `json:"email"`
-	Token    string `json:"token"`
-	Password string `json:"passowrd"`
+	UserName   string   `json:"username"`
+	Email      string   `json:"email"`
+	Token      string   `json:"token"`
+	Password   string   `json:"passowrd"`
+	Friendlist []string `json:"friendlist"`
+	Reqestlist []string `json:"reqestlist"`
 }
 
 // otp genaretor
@@ -199,10 +201,12 @@ func jsondatasave(email string, username string, password string) ([]user, error
 	token := dcstyletokengen(username, email, hashpass)
 
 	newuser := user{
-		Email:    email,
-		UserName: username,
-		Password: hashpass,
-		Token:    token,
+		Email:      email,
+		UserName:   username,
+		Password:   hashpass,
+		Token:      token,
+		Friendlist: []string{},
+		Reqestlist: []string{},
 	}
 
 	jsondata = append(jsondata, newuser)
@@ -223,8 +227,235 @@ func jsondatasave(email string, username string, password string) ([]user, error
 
 }
 
-// the login funciton
+// this funcion add "addinfriend" in "theuser" friendlist
+// and also remove "add friendin" form "theuser" requested list
+func addfriend(theuser string, addinfriend string) {
 
+	user, err := jsonreade()
+
+	if err != nil {
+		return
+	}
+
+	isdone := false
+	me := false
+	u := false
+	for i := range user {
+
+		if user[i].UserName == theuser {
+
+			user[i].Friendlist = append(user[i].Friendlist, addinfriend)
+
+			var cleanReqs []string
+			for _, r := range user[i].Reqestlist {
+				if r != addinfriend {
+					cleanReqs = append(cleanReqs, r)
+				}
+			}
+
+			user[i].Reqestlist = cleanReqs
+			me = true
+
+		}
+
+		if user[i].UserName == addinfriend {
+
+			user[i].Friendlist = append(user[i].Friendlist, theuser)
+			u = true
+
+		}
+
+		if me && u {
+			isdone = saveuserdata(user)
+			break
+		}
+	}
+
+	if isdone {
+		fmt.Printf(" \n Successfullty added \n")
+	}
+
+	fmt.Printf("\n user not found is request list ")
+}
+
+// this return u the friendlist slice
+func friendlistview(user string) []string {
+
+	jsondata, err := jsonreade()
+
+	if err != nil {
+		return nil
+	}
+
+	for i := range jsondata {
+		if jsondata[i].UserName == user {
+
+			for _, freinds := range jsondata[i].Friendlist {
+				fmt.Printf("%+v \n", freinds)
+			}
+
+			return jsondata[i].Friendlist
+		}
+	}
+
+	fmt.Printf(" \n User not found \n ")
+	return nil
+}
+
+// this return u the requestedlist slice
+func requestedlistview(user string) []string {
+
+	jsondata, err := jsonreade()
+
+	if err != nil {
+		return nil
+	}
+
+	for i := range jsondata {
+		if jsondata[i].UserName == user {
+
+			for _, Rfreinds := range jsondata[i].Reqestlist {
+				fmt.Printf("%+v \n", Rfreinds)
+			}
+
+			return jsondata[i].Reqestlist
+		}
+	}
+
+	fmt.Printf(" \n User not found \n ")
+	return nil
+}
+
+// this save the hole userd data that u modify by jsonreader
+func saveuserdata(savealluser []user) bool {
+
+	updateadata, err := json.MarshalIndent(savealluser, "", "\t")
+
+	if err != nil {
+		return false
+	}
+
+	err = os.WriteFile("database.json", updateadata, 0644)
+
+	if err != nil {
+		return false
+	}
+
+	return true
+
+}
+
+// this add "theuser" to the "requesteduser" request list
+func requestfirendadd(theuser string, requesteduser string) string {
+
+	if theuser == requesteduser {
+		return "invalid"
+	}
+
+	userdata, _ := jsonreade()
+	isdone := false
+	for i, userindo := range userdata {
+
+		if userindo.UserName == requesteduser {
+
+			if slices.Contains(userdata[i].Friendlist, theuser) {
+
+				return "alrady freinds!"
+			}
+
+			if slices.Contains(userdata[i].Reqestlist, theuser) {
+				return "requested alradysent"
+			}
+
+			userdata[i].Reqestlist = append(userdata[i].Reqestlist, theuser)
+			isdone = saveuserdata(userdata)
+
+			break
+
+		}
+
+	}
+
+	if isdone {
+		fmt.Printf(" \n success fully sented the request ")
+		return "done"
+	}
+
+	return "user not found "
+
+}
+
+// this remove the "theuser" form the "toremoveform" user request list
+func removeformreq(theusername string, toremoveform string) {
+
+	if theusername == toremoveform {
+		return
+	}
+
+	userdata, _ := jsonreade()
+
+	for i, stringuser := range userdata {
+
+		if stringuser.UserName == toremoveform {
+
+			var updatereqlist []string
+
+			for _, reqfreind := range userdata[i].Reqestlist {
+
+				if reqfreind != theusername {
+
+					updatereqlist = append(updatereqlist, reqfreind)
+				}
+
+			}
+
+			userdata[i].Reqestlist = updatereqlist
+
+			saveuserdata(userdata)
+			fmt.Printf("\n removed form reqlist ")
+			break
+		}
+	}
+}
+
+// me: The current logged-in user (e.g., "Luffy")
+// target: The friend you want to delete (e.g., "Zoro")
+func removeformfriendlist(me string, target string) {
+	// is it ok i gess yes its ok
+
+	if me == target {
+		return
+	}
+
+	userdata, _ := jsonreade()
+
+	for i, sclises := range userdata {
+
+		if sclises.UserName == me {
+
+			var updatefriendlist []string
+
+			for _, friends := range userdata[i].Friendlist {
+
+				if friends != target {
+
+					updatefriendlist = append(updatefriendlist, friends)
+
+				}
+
+			}
+
+			userdata[i].Friendlist = updatefriendlist
+			saveuserdata(userdata)
+
+			fmt.Printf("\n Removed form the friendlist \n")
+			break
+
+		}
+	}
+}
+
+// the login funciton
 func login(w http.ResponseWriter, r *http.Request) {
 
 	if r.URL.Path != "/login" {
@@ -376,26 +607,70 @@ func register(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// this is forget password email capture
-
 func forgetpass(w http.ResponseWriter, r *http.Request) {
+	// 1. CHECK FOR OTP AND NEW PASS FIRST
+	incamingotp := r.URL.Query().Get("otp")
+	incamingemail := r.URL.Query().Get("user")
+	incaminnewpass := r.URL.Query().Get("new")
 
-	if r.URL.Path != "/forgetpass" {
-		fmt.Printf(" faild show forget passpage : %+v", http.StatusNotFound)
+	if incamingotp != "" && incamingemail != "" {
+		savedotp := Otpstorage[incamingemail]
+
+		if savedotp.Code == incamingotp {
+			if incaminnewpass != "" {
+				// SUCCESS: Update the password in your JSON here!
+				fmt.Printf("\n SUCCESS: Changing password for %s to %s", incamingemail, incaminnewpass)
+				userdatas, _ := jsonreade()
+
+				for i := range userdatas {
+
+					if userdatas[i].Email == incamingemail {
+						newpass, _ := Hashpassword(incaminnewpass)
+						userdatas[i].Password = newpass
+						isdone := saveuserdata(userdatas)
+
+						if isdone {
+							fmt.Fprintf(w, " successfully reset password ")
+						}
+						break
+
+					}
+
+				}
+				fmt.Fprintf(w, "success:Password has been reset")
+				return // STOP HERE! Don't send another OTP.
+			}
+			fmt.Fprintf(w, "done:OTP is valid, please provide new pass")
+			return
+		}
+		fmt.Fprintf(w, "error:Invalid or expired OTP")
 		return
-	} else {
-
-		fmt.Fprintf(w, " \n Forgetpassrod gape is active :D \n")
 	}
 
-	var imcamingdata struct {
+	// 2. IF NO OTP, HANDLE EMAIL CAPTURE (SENDING OTP)
+	var incomingdata struct {
 		Email string `json:"email"`
 	}
 
-	json.NewDecoder(r.Body).Decode(&imcamingdata)
+	// Decode the JSON email
+	err := json.NewDecoder(r.Body).Decode(&incomingdata)
+	if err != nil || incomingdata.Email == "" {
+		return // Silently fail if no email provided
+	}
 
-	fmt.Printf(" \n we got the email that forget passwrod : %+v ", imcamingdata)
-
+	// Check database for email
+	jsondata, _ := jsonreade()
+	for i := range jsondata {
+		if jsondata[i].Email == incomingdata.Email {
+			otp := generateOTP()
+			sentOPTEmail(incomingdata.Email, otp)
+			otpsaveanddelate(otp, incomingdata.Email)
+			fmt.Printf("\n OTP SENTED TO THE EMAIL : %v ", incomingdata.Email)
+			fmt.Fprintf(w, "done:OTP sent to your email")
+			return // STOP HERE!
+		}
+	}
+	fmt.Fprintf(w, "not:Email not found")
 }
 
 func dcstyletokengen(username string, email string, password string) string {
@@ -428,7 +703,7 @@ func chating(w http.ResponseWriter, r *http.Request) {
 	client[username] = conn
 	clientMu.Unlock()
 
-	fmt.Printf(" \n %s has cannected the server : \n" , username )
+	fmt.Printf(" \n %s has cannected the server : \n", username)
 
 	defer func() {
 
@@ -449,10 +724,10 @@ func chating(w http.ResponseWriter, r *http.Request) {
 
 		row := string(p)
 		if strings.HasPrefix(row, "tusr:") {
-			parts := strings.SplitN(row, ":" , 4)
-			
+			parts := strings.SplitN(row, ":", 4)
+
 			if len(parts) >= 0 && parts[3] != "" {
-				
+
 				message := fmt.Sprintf(" [ %s ] : %s ", username, parts[3])
 				sendto(parts[1], message)
 			}
@@ -477,7 +752,7 @@ func sendto(tusr string, msg string) {
 	err := target.WriteMessage(websocket.TextMessage, []byte(msg))
 
 	if err != nil {
-		fmt.Printf("\n cannection problem : %s ", &err)
+		fmt.Printf("\n cannection problem : %v ", err)
 
 		target.Close()
 		delete(client, tusr)
@@ -485,8 +760,87 @@ func sendto(tusr string, msg string) {
 
 }
 
+func todo(w http.ResponseWriter, r *http.Request) {
+
+	username := r.URL.Query().Get("user")
+	token := r.URL.Query().Get("token")
+	action := r.URL.Query().Get("act")
+	targeteduser := r.URL.Query().Get("tar")
+
+	if username == "" || token == "" {
+		return
+	}
+
+	userdata, _ := jsonreade()
+
+	authorized := false
+	targetfound := false
+	userfound := false
+	for i := range userdata {
+
+		if userdata[i].UserName == targeteduser {
+			targetfound = true
+		}
+		if userdata[i].UserName == username && userdata[i].Token == token {
+
+			switch action {
+
+			case "sentfreq":
+
+				fmt.Printf(" \n its sentdreq %v ", targeteduser)
+
+			case "rejectfreq":
+
+				fmt.Printf(" \n its rejectreq ")
+
+			case "acceptfreq":
+
+				fmt.Printf(" \n its acceptreq ")
+
+			case "delatfre":
+
+				fmt.Printf(" \n its delatereq ")
+
+			default:
+				break
+
+			}
+
+			userfound = true
+
+		}
+
+		if targetfound && userfound {
+
+			authorized = true
+		}
+
+	}
+
+	if !authorized {
+
+		a := ""
+		b := ""
+
+		if targetfound && !userfound {
+			a = "target found but user missing"
+		} else if !targetfound && userfound {
+			a = "User found but targeted user missing"
+		} else if !targetfound && !userfound {
+			b = "target and user missing"
+		}
+
+		msg := fmt.Sprintf("Invalid Token or User . %v , %v ", a, b)
+
+		fmt.Fprintf(w, " %v ", msg)
+
+	}
+
+}
+
 func main() {
 
+	// addfriend("dra34ken" , "mikey3")
 	// jsondata, err := jsonreade()
 	// if err != nil {
 	// 	fmt.Printf(" Faild to Load json file : " , err)
@@ -506,7 +860,8 @@ func main() {
 	http.HandleFunc("/signup", checkup)
 	http.HandleFunc("/confarmregister", register)
 	http.HandleFunc("/forgetpass", forgetpass)
-	http.HandleFunc("/chat" , chating)
+	http.HandleFunc("/chat", chating)
+	http.HandleFunc("/do", todo)
 
 	// http.HandleFunc("/chat-init" , long)
 
