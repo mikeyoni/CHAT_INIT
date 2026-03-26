@@ -4,7 +4,8 @@
 		"email": "mda2342@gmail.com",
 		"token": "",
 		"passowrd": "mikey",
-		"friendlist": null
+		"friendlist": null,
+		"reqestlist": null
 	},
 	{
 		"username": "dra34ken",
@@ -14,13 +15,15 @@
 		"friendlist": [
 			"mikey2",
 			"mikey3"
-		]
+		],
+		"reqestlist": null
 	},
 	{
 		"username": "mikey2",
 		"email": "mda891526@gmail.com",
 		"token": "bWlrZXkyOm1kYTg5MTUyNkBnbWFpbC5jb206VGFUVWdOdk0xMg==",
-		"passowrd": "$2a$10$5QwaRTva6Etx1JjvchvabeJ/MclZaeiFgFQowW3sTTdTaTUgNvM12",
-		"friendlist": null
+		"passowrd": "$2a$10$3WJv49WGz.7SFniXyz9p6.C49ZXCBj0W1ugOBVRdQ.FLKXIKlsVeO",
+		"friendlist": null,
+		"reqestlist": null
 	}
 ]
