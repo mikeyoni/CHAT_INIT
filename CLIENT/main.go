@@ -3,24 +3,90 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"strings"
-
-	// "time"
-
-	// "encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"time"
 
-	// "golang.org/x/tools/go/analysis/checker"
-
+	"github.com/charmbracelet/lipgloss"
+	"github.com/common-nighthawk/go-figure"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
-	// "net/url"
-	// "net/http"
 )
+
+func cls() {
+	cmd := exec.Command("clear")
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+}
+
+func exit() {
+
+	cmd := exec.Command("exit")
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+}
+
+var baseURL string
+
+var (
+	userpromptStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00FFFF")).
+			Bold(true).
+			Padding(0, 1).
+			MarginLeft(2).
+			Render("👤 ENTER USERNAME ")
+	passpromptStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9500ff")).
+			Bold(true).
+			Padding(0, 1).
+			MarginLeft(2).
+			Render("🔒 ENTER PASSWORD ")
+	EmailpromptStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#ff0088")).
+				Bold(true).
+				Padding(0, 1).
+				MarginLeft(2).
+				Render("✉️ ENTER EMAIL	 ")
+
+	// 2. Create an "Arrow" style
+	arrowStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#7D56F4")).
+			Bold(true).
+			Render("\n   ❯ ")
+
+	// 2. Create an "Arrow" style
+	REDarrowStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("rgb(205, 0, 0)")).
+			Bold(true).
+			Render("\n   ❯ ")
+
+	headerStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#7D56F4")). // Purple
+			Border(lipgloss.RoundedBorder()).      // Nice rounded box
+			Padding(0, 3).                         // Space inside the box
+			MarginLeft(2)                          // Space from the left edge
+
+	texts = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#00ff9d")). // Purple
+		Border(lipgloss.RoundedBorder()).      // Nice rounded box
+		Padding(0, 3).                         // Space inside the box
+		MarginLeft(2)                          // Space from the left edge
+)
+
+var yellotext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffd900"))
+var Redtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true)
+var greentext = lipgloss.NewStyle().Foreground(lipgloss.Color("#3cff00")).Bold(true)
+var purpultext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0062")).Bold(true)
+var cynetext = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ffff"))
+var wboldtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Bold(true)
 
 var (
 	mytoken string
@@ -29,7 +95,7 @@ var (
 
 // this is login function it do post login info in a url in json form package
 
-func login(url string, username string, password string) {
+func login(url string, username string, password string) bool {
 
 	url = fmt.Sprintf("%s/login", string(url))
 
@@ -45,7 +111,7 @@ func login(url string, username string, password string) {
 	if err != nil {
 
 		fmt.Printf("\n Faild to sent post req : %v ", err)
-		return
+		return false
 	} else {
 
 		fmt.Printf(" \n sucessfully sented : %v ", resp.Status)
@@ -63,14 +129,19 @@ func login(url string, username string, password string) {
 		savecradenshial(username, parts[2])
 		mytoken = parts[2]
 
-		fmt.Printf(" \n successfully login \n")
+		return true
 	}
 
+	if parts[0] == "not" {
+		fmt.Printf(" \n %v ", parts[1])
+	}
+
+	return false
 }
 
 // this is register function this do post register info to the srever in json form
 
-func emailcheck(url string, email string, username string, password string) {
+func emailcheck(url string, email string, username string, password string) bool {
 
 	urle := fmt.Sprintf("%s/signup", url)
 
@@ -83,17 +154,21 @@ func emailcheck(url string, email string, username string, password string) {
 	jsondata, err := json.Marshal(data)
 	if err != nil {
 
-		fmt.Printf(" \n faild to marshel json data : %v ", err)
-		return
+		msg := fmt.Sprintf("\n Faild to Marshel json data : %v ", err)
+		fmt.Print(purpultext.Render(msg))
+		return false
 	}
 	resp, err := http.Post(urle, "application/json-data", bytes.NewBuffer(jsondata))
 
 	if err != nil {
-		fmt.Printf(" \n failt to post register info : %v ", err)
-		return
+		msg := fmt.Sprintf("\n Faild to post register data : %v ", err)
+		fmt.Print(Redtext.Render(msg))
+
+		return false
 	} else {
 
-		fmt.Printf(" \n successfuly posted register data : %v ", err)
+		msg := fmt.Sprintf("\n Sucessfully Posted Register data : %v ", resp.Status)
+		fmt.Print(greentext.Render(msg))
 
 	}
 
@@ -105,8 +180,10 @@ func emailcheck(url string, email string, username string, password string) {
 
 	if massage == "success" {
 		register(url, email, username, password)
+		return true
 	}
 
+	return false
 }
 
 func register(url string, email string, username string, password string) {
@@ -114,7 +191,7 @@ func register(url string, email string, username string, password string) {
 	url = fmt.Sprintf("%s/confarmregister", url)
 
 	var userinput string
-	fmt.Printf(" \n Enter the otp : ")
+	fmt.Print(cynetext.Render(" \n Enter the otp : "))
 	fmt.Scan(&userinput)
 
 	data := map[string]string{
@@ -128,17 +205,23 @@ func register(url string, email string, username string, password string) {
 	jsondata, err := json.Marshal(data)
 	if err != nil {
 
-		fmt.Printf(" \n faild to marshel json data : %v ", err)
+		msg := fmt.Sprintf("\n Faild to Marshel json data : %v ", err)
+		fmt.Print(Redtext.Render(msg))
+
 		return
 	}
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsondata))
 
 	if err != nil {
-		fmt.Printf(" \n failt to post register info : %v ", err)
+
+		msg := fmt.Sprintf("\n Faild to Post Register info : %v ", err)
+		fmt.Print(Redtext.Render(msg))
+
 		return
 	} else {
 
-		fmt.Printf(" \n successfuly posted register data : %v ", err)
+		msg := fmt.Sprintf("\n Successfully Posted the Register data : %v ", resp.Status)
+		fmt.Print(greentext.Render(msg))
 
 	}
 
@@ -150,7 +233,7 @@ func register(url string, email string, username string, password string) {
 	partsmessge := strings.Split(servermessage, ":")
 
 	if len(partsmessge) > 0 && partsmessge[0] == "success" {
-		fmt.Printf("\n login successfully \n")
+		fmt.Print(greentext.Render("\n login successfully \n"))
 		savecradenshial(username, partsmessge[2])
 		mytoken = partsmessge[2]
 	}
@@ -159,7 +242,7 @@ func register(url string, email string, username string, password string) {
 
 // forget password
 
-func forgetpass(baseURL string, email string) {
+func forgetpass(baseURL string, email string) bool {
 	// 1. REQUEST THE OTP
 	url := fmt.Sprintf("%s/forgetpass", baseURL)
 	data := map[string]string{"email": email}
@@ -167,7 +250,7 @@ func forgetpass(baseURL string, email string) {
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsondata))
 	if err != nil {
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
@@ -184,20 +267,20 @@ func forgetpass(baseURL string, email string) {
 		fmt.Printf("\n Enter New Password: ")
 		fmt.Scan(&newPassInput)
 
-		// 2. SEND OTP AND PASSWORD BACK
-		// We use the same URL but add ?otp=...&user=...&new=...
 		resetURL := fmt.Sprintf("%s/forgetpass?otp=%s&user=%s&new=%s", baseURL, otpInput, email, newPassInput)
 
-		// We send nil for the body because the data is in the URL now
 		resp2, err := http.Post(resetURL, "application/json", nil)
 		if err != nil {
-			return
+			return false
 		}
 		defer resp2.Body.Close()
 
 		finalBody, _ := io.ReadAll(resp2.Body)
 		fmt.Printf("\n Final Result: %s", string(finalBody))
+		return true
 	}
+
+	return false
 }
 
 func savecradenshial(username string, tokeen string) {
@@ -207,9 +290,10 @@ func savecradenshial(username string, tokeen string) {
 	err := os.WriteFile(".env", []byte(contents), 0644)
 
 	if err != nil {
-		fmt.Printf("\n faild to save the credential : %v", err)
+		msg := fmt.Sprintf("\n Faild to save the cradential : %v ", err)
+		fmt.Print(Redtext.Render(msg))
+
 	}
-	fmt.Printf("\n successflyy cradentional saved \n")
 
 }
 
@@ -220,22 +304,28 @@ func chate(tusr string, token string, user string) {
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 
 	if err != nil {
-		fmt.Printf("\n handshake faild \n : %v", err)
+		msg := fmt.Sprintf("\n handshake faild : %v ", err)
+		fmt.Print(Redtext.Render(msg))
 		return
 	}
 
 	defer conn.Close()
 
-	fmt.Printf("\n We are in Cannected to the server \n")
+	showModernLogo()
+
+	fmt.Print(cynetext.Render(" We are in Cannected to the server \n  ( Prss enter to Start Chat ) \n "))
+
+	done := make(chan struct{})
 
 	go func() {
-
+		defer close(done)
 		for {
 
 			_, p, err := conn.ReadMessage()
 
 			if err != nil {
-				fmt.Printf("\n Faild to resive message : %v ", err)
+				msg := fmt.Sprintf("\n Faild to resive message : %v ", err)
+				fmt.Print(Redtext.Render(msg))
 				return
 			}
 
@@ -250,11 +340,21 @@ func chate(tusr string, token string, user string) {
 	for {
 
 		if scanner.Scan() {
-			fmt.Printf(" TO --> %s \n > ", tusr)
+
+			this := fmt.Sprintf("\n TO -- > %s  ", tusr)
+			fmt.Print(cynetext.Render(this) + Redtext.Render("[ !back to exit ]") + arrowStyle)
 			text := scanner.Text()
 
 			if text == "" {
 				continue
+			}
+
+			if text == "!back" {
+				conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+				conn.Close()
+				cls()
+				DM(baseURL)
+				return
 			}
 
 			msg := fmt.Sprintf("tusr:%s:user:%s", tusr, text)
@@ -267,6 +367,9 @@ func chate(tusr string, token string, user string) {
 
 		}
 	}
+
+	conn.Close()
+	<-done
 
 }
 
@@ -313,73 +416,479 @@ func todo(url, token string, user string, action string, targetuser string) {
 	fmt.Printf(" \n %v  \n", message)
 }
 
-// func rejectfreindreq(url, token string, user string) {
+func showModernLogo() {
+	// 1. Create a stylish box for the Title
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(lipgloss.Color("#5A189A")). // Deep Purple
+		Padding(0, 2).
+		MarginLeft(2)
 
-// 	act := "rejectfreq"
-// 	Url := fmt.Sprintf("%s/do?user=%s&token=%s&act=%s", url, user, token, act)
+	// 2. Create a "Tag" for the version
+	versionStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#000000")).
+		Background(lipgloss.Color("#00F5D4")). // Neon Teal
+		Padding(0, 1)
 
-// 	resp, err := http.Post(Url, "application/json", nil)
+	// 3. Create a subtitle line
+	subtitle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#9D4EDD")).
+		Italic(true).
+		MarginLeft(2).
+		Render("Ship: Thousand Sunny • Location: New World")
 
-// 	if err != nil {
-// 		fmt.Printf("\n Failed to send friend request: %v", err)
-// 		return
-// 	}
+	// Combine them
+	header := lipgloss.JoinHorizontal(lipgloss.Top,
+		titleStyle.Render(" CHAT-INIT "),
+		versionStyle.Render(" v2.0 "),
+	)
 
-// 	defer resp.Body.Close()
+	fmt.Println("\n" + header)
+	fmt.Println(subtitle + "\n")
+}
 
-// 	if resp.StatusCode == http.StatusOK {
-// 		fmt.Printf("\n Friend request sent to %s!", user)
-// 	} else {
-// 		fmt.Printf("\n Server returned error: %s", resp.Status)
-// 	}
-// }
+func showPirateLogo() {
+	poster := lipgloss.NewStyle().
+		Border(lipgloss.DoubleBorder()).
+		BorderForeground(lipgloss.Color("#E8833A")). // Bounty Gold
+		Padding(1, 4).
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color("#FAFAFA")).
+		Render("  ⚓ CHAT-INIT ⚓  \n  THE GREAT PIRATE ERA  ")
 
-// func acceptfreindreq(url, token string, user string) {
+	fmt.Println(poster)
+}
 
-// 	act := "acceptfreq"
-// 	Url := fmt.Sprintf("%s/do?user=%s&token=%s&act=%s", url, user, token, act)
+func showBigModernLogo() {
+	// 1. Create two separate figures for the two words
+	// "block" is the boldest clean font available
+	chatFig := figure.NewFigure(" CHAT-", "block", true).String()
+	initFig := figure.NewFigure("INIT ", "block", true).String()
 
-// 	resp, err := http.Post(Url, "application/json", nil)
+	// 2. Create Styles for each word
+	chatStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#fff700")). // Luffy Red
+		Bold(true)
 
-// 	if err != nil {
-// 		fmt.Printf("\n Failed to send friend request: %v", err)
-// 		return
-// 	}
+	initStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00c3ff")). // Bounty Gold
+		Bold(true)
 
-// 	defer resp.Body.Close()
+	// 3. Join them horizontally so they sit on the same line
+	// This makes the logo two different colors side-by-side
+	fullLogo := lipgloss.JoinHorizontal(lipgloss.Top,
+		chatStyle.Render(chatFig),
+		initStyle.Render(initFig),
+	)
 
-// 	if resp.StatusCode == http.StatusOK {
-// 		fmt.Printf("\n Friend request sent to %s!", user)
-// 	} else {
-// 		fmt.Printf("\n Server returned error: %s", resp.Status)
-// 	}
-// }
+	fmt.Println(fullLogo)
 
-// func delatefreind(url, token string, user string) {
+	// 4. Subtitle with a nice border or highlight
+	subtitleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00F5D4")).
+		Background(lipgloss.Color("#1A1A1A")). // Darker background for contrast
+		Padding(0, 1).
+		MarginLeft(4).
+		Render(" Ship: Thousand Sunny • Location: New World v2.0 by @mikeyoni < GH ")
 
-// 	act := "delatfre"
-// 	Url := fmt.Sprintf("%s/do?user=%s&token=%s&act=%s", url, user, token, act)
+	fmt.Println(subtitleStyle)
+}
 
-// 	resp, err := http.Post(Url, "application/json", nil)
+func getUsername() string {
 
-// 	if err != nil {
-// 		fmt.Printf("\n Failed to send friend request: %v", err)
-// 		return
-// 	}
+	fmt.Print(userpromptStyle + arrowStyle)
 
-// 	defer resp.Body.Close()
+	// 3. Take the input
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		return scanner.Text()
+	}
+	return ""
+}
 
-// 	if resp.StatusCode == http.StatusOK {
-// 		fmt.Printf("\n Friend request sent to %s!", user)
-// 	} else {
-// 		fmt.Printf("\n Server returned error: %s", resp.Status)
-// 	}
-// }
+func getPassword() string {
+
+	fmt.Print(passpromptStyle + REDarrowStyle)
+
+	// 3. Take the input
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		return scanner.Text()
+	}
+	return ""
+}
+
+func getEmail() string {
+
+	fmt.Print(EmailpromptStyle + REDarrowStyle)
+
+	// 3. Take the input
+	scanner := bufio.NewScanner(os.Stdin)
+	if scanner.Scan() {
+		return scanner.Text()
+	}
+	return ""
+}
+
+var flist []string
+
+func DM(url string) {
+
+	for {
+		cls()
+		showBigModernLogo()
+		flist = viewflist(url)
+
+		title := "           Direct Message        \n"
+		footer := fmt.Sprintf("\n          Chouse Numbers to msg them <3      \n %v ", purpultext.Render("  0. Exit   111. Friend Manage "))
+
+		var list string
+
+		if len(flist) > 0 {
+
+			for i := range flist {
+
+				list += fmt.Sprintf(" %v • %v\n", i+1, flist[i])
+
+			}
+
+		} else {
+
+			fmt.Println(texts.Render(title + " No friend in this New World  "))
+		}
+
+		fmt.Println(texts.Render(title + wboldtext.Render(list) + footer))
+
+		scanner := bufio.NewScanner(os.Stdin)
+
+		fmt.Printf("%v", arrowStyle)
+
+		if scanner.Scan() {
+
+			cleanText := strings.TrimSpace(scanner.Text())
+			choice, err := strconv.Atoi(cleanText)
+
+			if err != nil {
+				fmt.Printf("\n ❌ That's not a number, %v \n", myuser)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			if choice == 0 {
+				return
+			}
+			if choice == 111 {
+				freindsetting()
+				return
+			}
+
+			if choice > 0 && choice <= len(flist) {
+
+				targeteruser := flist[choice-1]
+
+				cls()
+				chate(targeteruser, mytoken, myuser)
+
+				break
+
+			} else {
+				fmt.Println("❌ Invalid friend number!")
+				time.Sleep(1 * time.Second)
+				continue
+
+			}
+
+		}
+
+	}
+
+}
+
+func freindsetting() {
+
+	var next bool
+
+	for {
+
+		cls()
+		showBigModernLogo()
+
+		title := " \n            Friend Manage            \n"
+		cmds := " \n 1. Add Friend  2. Delate Friend 3. Accept Friend \n 4. Reject Friend   5. Next  6. Friend list 0. Exit    \n"
+		var listVer string
+
+		Reqlist = viewReqlist(baseURL)
+		titless := greentext.Render("    Friends     ")
+		Rtitless := greentext.Render("    Requested     ")
+		Friendlist := flist
+		Reclist := Reqlist
+
+		var reqLisevew string
+
+		for i := range Friendlist {
+			listVer += fmt.Sprintf("\n • %v  \n", Friendlist[i])
+		}
+
+		for i := range Reclist {
+			reqLisevew += fmt.Sprintf("\n • %v  \n", Reclist[i])
+		}
+
+		switch next {
+		case true:
+
+			fmt.Println(texts.Render(title + texts.Render(Rtitless+wboldtext.Render(reqLisevew)) + purpultext.Render(cmds)))
+
+		default:
+
+			fmt.Println(texts.Render(title + texts.Render(titless+wboldtext.Render(listVer)) + purpultext.Render(cmds)))
+
+		}
+
+		scanner := bufio.NewScanner(os.Stdin)
+
+		fmt.Printf("%v", arrowStyle)
+
+		if scanner.Scan() {
+
+			cleanText := strings.TrimSpace(scanner.Text())
+			choice, err := strconv.Atoi(cleanText)
+
+			if err != nil {
+				fmt.Printf("\n ❌ That's not a number, %v \n", myuser)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+
+			if choice == 0 {
+				DM(baseURL)
+				return
+			}
+
+			if choice > 0 && choice <= 6 {
+
+				if choice == 1 {
+					user := getUsername()
+
+					todo(baseURL, mytoken, myuser, "SRQ", user)
+				}
+
+				if choice == 2 {
+					user := getUsername()
+
+					todo(baseURL, mytoken, myuser, "DLF", user)
+				}
+
+				if choice == 3 {
+					user := getUsername()
+
+					todo(baseURL, mytoken, myuser, "AFQ", user)
+				}
+
+				if choice == 4 {
+					user := getUsername()
+
+					todo(baseURL, mytoken, myuser, "RFQ", user)
+				}
+
+				if choice == 5 {
+					next = true
+					continue
+				}
+
+				if choice == 6 {
+					next = false
+					continue
+				}
+			}
+
+		} else {
+			fmt.Println("❌ Invalid Option number!")
+			time.Sleep(1 * time.Second)
+			continue
+
+		}
+
+	}
+
+}
+
+func tokenchekcing(url string) bool {
+
+	url = fmt.Sprintf("%v/checking?token=%s", url, mytoken)
+
+	resp, _ := http.Post(url, "application/checking", nil)
+
+	replaybyte, _ := io.ReadAll(resp.Body)
+
+	replay := string(replaybyte)
+
+	if replay == "ok" {
+		return true
+	} else if replay == "no" {
+		return false
+	}
+
+	defer resp.Body.Close()
+	return false
+
+}
+
+func viewflist(url string) []string {
+
+	url = fmt.Sprintf("%v/viewflist?token=%v&user=%v", url, mytoken, myuser)
+
+	resp, err := http.Post(url, "aplication/flistreq", nil)
+
+	if err != nil {
+		return nil
+	}
+
+	defer resp.Body.Close()
+
+	serverbytes, _ := io.ReadAll(resp.Body)
+
+	var Flist []string
+
+	err = json.Unmarshal(serverbytes, &Flist)
+
+	if err != nil {
+		return nil
+	}
+
+	return Flist
+}
+
+func viewReqlist(url string) []string {
+
+	url = fmt.Sprintf("%v/viewReqlist?token=%v&user=%v", url, mytoken, myuser)
+
+	resp, err := http.Post(url, "aplication/Rlistreq", nil)
+
+	if err != nil {
+		return nil
+	}
+
+	defer resp.Body.Close()
+
+	serverbytes, _ := io.ReadAll(resp.Body)
+
+	var Rlist []string
+
+	err = json.Unmarshal(serverbytes, &Rlist)
+
+	if err != nil {
+		return nil
+	}
+
+	return Rlist
+}
+
+func manue(url string, user string, token string) {
+	for {
+		showBigModernLogo()
+
+		istokenvalid := tokenchekcing(url)
+
+		if token != "" && user != "" {
+			DM(url)
+			break
+		}
+
+		if !istokenvalid {
+
+			isbreak := false
+			fmt.Println(headerStyle.Render(" WELCOME TO CHAT-INIT "))
+			fmt.Println(texts.Render(" CHOUSE OPTION 0-3   \n 1. Login  \n 2. Register \n 3. Forget-password   \n 0. Exit "))
+
+			userinput := bufio.NewScanner(os.Stdin)
+
+			fmt.Printf("%v", cynetext.Render("  > "))
+
+			if userinput.Scan() {
+				text := userinput.Text()
+				switch text {
+
+				case "1":
+
+					username := getUsername()
+					password := getPassword()
+
+					idone := login(url, username, password)
+
+					if idone {
+
+						DM(url)
+						isbreak = true
+
+					} else if !idone {
+						fmt.Print(Redtext.Render("Faild to login Try again !"))
+
+					}
+
+				case "2":
+
+					username := getUsername()
+					password := getPassword()
+					email := getEmail()
+					Isonehh := emailcheck(baseURL, email, username, password)
+
+					if Isonehh {
+
+						DM(url)
+						isbreak = true
+
+					} else if !Isonehh {
+
+						fmt.Print(Redtext.Render(" \n Faild to Register "))
+					}
+
+				case "3":
+
+					Email := getEmail()
+
+					isdone := forgetpass(baseURL, Email)
+
+					if isdone {
+
+						fmt.Print(greentext.Render(" \n Successfully Password Reset Login Now "))
+						time.Sleep(2 * time.Second)
+						continue
+
+					} else if !isdone {
+
+						fmt.Print(Redtext.Render(" \n Faild to Reset Password try again "))
+					}
+
+				case "0":
+					cls()
+					fmt.Printf("\n Bye Bye Have a Gud Day <3  ;) ")
+					isbreak = true
+
+				default:
+					fmt.Println(" Invalid ")
+				}
+
+				time.Sleep(50 * time.Millisecond)
+
+			}
+
+			if isbreak {
+				break
+			}
+
+		}
+	}
+	fmt.Println()
+}
+
+var Reqlist []string
 
 func main() {
 
 	url := "http://localhost"
 	port := ":4040"
+	baseURL = fmt.Sprintf("%v%v", url, port)
 
 	url = fmt.Sprintf("%v%v", url, port)
 
@@ -391,16 +900,6 @@ func main() {
 	mytoken = os.Getenv("token")
 	myuser = os.Getenv("user")
 
-	// login("http://localhost:4040/login", "dra34ken", "paf32453")
-	// login(url, "mikey2", "paf32453")
-
-	// emailcheck(url, "mda891526@gmail.com", "mikey2", "paf32453")
-
-	todo(url, mytoken, myuser, "SRQ", "dra34ken")
-	// tosend := "dra34ken"
-
-	// // chate(tosend, mytoken, myuser)
-
-	// forgetpass(url, "mda891526@gmail.com")
+	manue(url, myuser, mytoken)
 
 }
