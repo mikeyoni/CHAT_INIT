@@ -6,6 +6,17 @@
 
 --- 
 MM
+---
+MM
+## 📸 Screenshots (The New World)
+
+| | | |
+|:---:|:---:|:---:|
+| ![1](1.png) | ![2](2.png) | ![3](3.png) |
+| ![4](4.png) | ![5](5.png) | ![6](6.png) |
+| ![7](7.png) | ![8](8.png) | |
+
+---
 
 ## 🚀 Key Features
 * **Real-time Core:** Instant messaging powered by a Go-powered WebSocket backend.
@@ -16,12 +27,27 @@ MM
 
 ---
 
+## ⚙️ Critical Configuration (For OTP)
+To enable the registration and OTP (One-Time Password) system, you must configure your environment variables.
+
+1. Create a `.env` file in the root directory.
+2. Generate a **Google App Password** (since standard Gmail passwords are blocked for third-party apps).
+3. Add your credentials to the `.env`:
+
+```env
+GMAIL_USER=your-email@gmail.com
+GMAIL_PASS=your-16-character-app-password
+```
+
+---
+
 ## 🛠 Tech Stack
 * **Language:** Go (Golang)
 * **Protocol:** Gorilla WebSockets
 * **UI Framework:** Charmbracelet Lipgloss
 * **Target OS:** Linux (Optimized for Fedora 43 / GNOME Terminal / Kitty)
 
+---
 
 ## 📥 Installation & Setup
 
@@ -64,5 +90,5 @@ go run main.go
 ---
 
 ## 📜 License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 ```
