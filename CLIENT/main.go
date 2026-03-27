@@ -334,7 +334,7 @@ func chate(tusr string, token string, user string) {
 				return
 			}
 
-			fmt.Println(Redtext.Render(string(p)))
+			fmt.Println(yellotext.Render(" \n " + string(p)))
 
 		}
 
