@@ -313,11 +313,7 @@ func requestedlistview(user string) []string {
 
 	for i := range jsondata {
 		if jsondata[i].UserName == user {
-
-			for _, Rfreinds := range jsondata[i].Reqestlist {
-				fmt.Printf("%+v \n", Rfreinds)
-			}
-
+			fmt.Println(" Done sending friend req ")
 			return jsondata[i].Reqestlist
 		}
 	}
@@ -490,7 +486,9 @@ func login(w http.ResponseWriter, r *http.Request) {
 				usertoke := user.Token
 				fmt.Fprintf(w, "success:token:%s", usertoke)
 			}
-
+			if !passwordfund {
+				fmt.Fprintf(w, "not:Password not match")
+			}
 			break
 
 		}
@@ -683,6 +681,34 @@ func dcstyletokengen(username string, email string, password string) string {
 
 }
 
+func tokencheck(token string) bool {
+
+	jsondata, _ := jsonreade()
+
+	for i := range jsondata {
+
+		if jsondata[i].Token == token {
+			return true
+		}
+	}
+
+	return false
+}
+
+func checktoken(w http.ResponseWriter, r *http.Request) {
+
+	token := r.URL.Query().Get("token")
+	isok := tokencheck(token)
+
+	if isok {
+		fmt.Printf(" \n Token is valid ! ")
+		fmt.Fprintf(w, "ok")
+	} else if !isok {
+
+		fmt.Fprintf(w, "no")
+	}
+}
+
 func chating(w http.ResponseWriter, r *http.Request) {
 
 	username := r.URL.Query().Get("user")
@@ -693,71 +719,97 @@ func chating(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "\n user info misisng \n ")
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	istokenvalid := tokencheck(token)
 
-	if err != nil {
-		return
-	}
+	if istokenvalid {
 
-	clientMu.Lock()
-	client[username] = conn
-	clientMu.Unlock()
-
-	fmt.Printf(" \n %s has cannected the server : \n", username)
-
-	defer func() {
-
-		clientMu.Lock()
-		fmt.Printf(" %s has left form canection ", username)
-		delete(client, username)
-		clientMu.Unlock()
-
-	}()
-
-	for {
-
-		_, p, err := conn.ReadMessage()
+		conn, err := upgrader.Upgrade(w, r, nil)
 
 		if err != nil {
-			break
+			return
 		}
 
-		row := string(p)
-		if strings.HasPrefix(row, "tusr:") {
-			parts := strings.SplitN(row, ":", 4)
+		clientMu.Lock()
+		client[username] = conn
+		clientMu.Unlock()
 
-			if len(parts) >= 0 && parts[3] != "" {
+		fmt.Printf(" \n %s has cannected the server : \n", username)
 
-				message := fmt.Sprintf(" [ %s ] : %s ", username, parts[3])
-				sendto(parts[1], message)
+		defer func() {
+
+			clientMu.Lock()
+			fmt.Printf(" %s has left form canection ", username)
+			delete(client, username)
+			clientMu.Unlock()
+
+		}()
+
+		for {
+
+			_, p, err := conn.ReadMessage()
+
+			if err != nil {
+				break
 			}
+
+			row := string(p)
+			if strings.HasPrefix(row, "tusr:") {
+				parts := strings.SplitN(row, ":", 4)
+
+				if len(parts) >= 0 && parts[3] != "" {
+
+					message := fmt.Sprintf(" [ %s ] : %s ", username, parts[3])
+
+					var isfriend = false
+
+					friendlist := friendlistview(parts[1])
+
+					isfriend = slices.Contains(friendlist, username)
+
+					if isfriend {
+
+						success := sendto(parts[1], message)
+
+						if !success {
+
+							offlineMsg := fmt.Sprintf("System: %s is currently offline. Your message was not delivered.", parts[1])
+							conn.WriteMessage(websocket.TextMessage, []byte(offlineMsg))
+						}
+					} else {
+
+						conn.WriteMessage(websocket.TextMessage, []byte("System: You are not in this user's friend list."))
+					}
+
+				}
+			}
+
 		}
 
 	}
 
 }
 
-func sendto(tusr string, msg string) {
-
+func sendto(tusr string, msg string) bool {
 	clientMu.Lock()
 	defer clientMu.Unlock()
 
 	target, ok := client[tusr]
 
 	if !ok {
-		fmt.Printf("\n the user is offline \n ")
-		return
+
+		fmt.Printf("\n User %s is offline \n", tusr)
+		return false
 	}
 
 	err := target.WriteMessage(websocket.TextMessage, []byte(msg))
-
 	if err != nil {
-		fmt.Printf("\n cannection problem : %v ", err)
-
+		fmt.Printf("\n Connection problem: %v \n", err)
 		target.Close()
 		delete(client, tusr)
+		return false
 	}
 
+	return true
 }
 
 func todo(w http.ResponseWriter, r *http.Request) {
@@ -787,19 +839,24 @@ func todo(w http.ResponseWriter, r *http.Request) {
 
 			case "sentfreq":
 
-				fmt.Printf(" \n its sentdreq %v ", targeteduser)
+				fmt.Printf(" \n its sentdreq to %v ", targeteduser)
+				requestfirendadd(username, targeteduser)
 
 			case "rejectfreq":
 
-				fmt.Printf(" \n its rejectreq ")
+				fmt.Printf(" \n its rejectreq %v form %v req list ", targeteduser, username)
+				removeformreq(targeteduser, username)
 
 			case "acceptfreq":
 
-				fmt.Printf(" \n its acceptreq ")
+				fmt.Printf(" \n its acceptreq the freind req of %v ", targeteduser)
+				addfriend(username, targeteduser)
 
 			case "delatfre":
 
-				fmt.Printf(" \n its delatereq ")
+				fmt.Printf(" \n its delatereq %v form %v list", targeteduser, username)
+				removeformfriendlist(username, targeteduser)
+				removeformfriendlist(targeteduser, username)
 
 			default:
 				break
@@ -838,6 +895,67 @@ func todo(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func flistgiver(w http.ResponseWriter, r *http.Request) {
+
+	user := r.URL.Query().Get("user")
+	token := r.URL.Query().Get("token")
+
+	isvalid := tokencheck(token)
+
+	var freindlist []string
+
+	if isvalid {
+		freindlist = friendlistview(user)
+
+		if freindlist == nil {
+			fmt.Printf("\n Frliend list is empty ")
+			return
+		}
+
+		jsondata, err := json.Marshal(freindlist)
+
+		if err != nil {
+			fmt.Printf("\n Data marsheling proble : %v ", err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+
+		w.Write(jsondata)
+	}
+
+}
+
+func GIveReqlist(w http.ResponseWriter, r *http.Request) {
+
+	user := r.URL.Query().Get("user")
+	token := r.URL.Query().Get("token")
+
+	isvalid := tokencheck(token)
+
+	var Rreindlist []string
+
+	if isvalid {
+		Rreindlist = requestedlistview(user)
+
+		if Rreindlist == nil {
+			fmt.Printf("\n Frliend list is empty ")
+			return
+		}
+
+		jsondata, err := json.Marshal(Rreindlist)
+
+		if err != nil {
+			fmt.Printf("\n Data marsheling proble : %v ", err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jsondata)
+	}
+
+}
+
 func main() {
 
 	// addfriend("dra34ken" , "mikey3")
@@ -862,6 +980,9 @@ func main() {
 	http.HandleFunc("/forgetpass", forgetpass)
 	http.HandleFunc("/chat", chating)
 	http.HandleFunc("/do", todo)
+	http.HandleFunc("/checking", checktoken)
+	http.HandleFunc("/viewflist", flistgiver)
+	http.HandleFunc("/viewReqlist", GIveReqlist)
 
 	// http.HandleFunc("/chat-init" , long)
 
