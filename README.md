@@ -5,7 +5,7 @@
 **CHAT-INIT** is a real-time, WebSocket-based terminal chatting application. Built for developers who live in the shell, it strips away the bloat of modern GUIs in favor of speed, efficiency, and a "Pirate King" aesthetic.
 
 ---
-
+MM
 ## 📸 Screenshots (The New World)
 
 | | | |
