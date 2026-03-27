@@ -339,7 +339,7 @@ func chate(tusr string, token string, user string) {
 		}
 
 	}()
-
+	// hmm
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
