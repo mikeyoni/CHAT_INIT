@@ -80,7 +80,7 @@ func broadcastee(msg string, sendere string) {
 			if err != nil {
 				conn.Close()
 				delete(clientes, username)
-		
+
 			}
 		}
 	}
@@ -93,7 +93,7 @@ func main() {
 	fmt.Printf("\n Server is started on : 6060 \n")
 	err := http.ListenAndServe(":6060", nil)
 	if err != nil {
-		fmt.Printf(" server is not started : ", err)
+		fmt.Printf(" server is not started : %v ", err)
 		return
 	}
 

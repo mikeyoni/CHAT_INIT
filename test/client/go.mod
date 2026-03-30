@@ -1,5 +1,5 @@
-module client.go
+module chatinit-test-client
 
-go 1.25.8
+go 1.25.4
 
 require github.com/gorilla/websocket v1.5.3
