@@ -1,6 +1,6 @@
-module main.go
+module chatinit-server
 
-go 1.25.8
+go 1.25.4
 
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
