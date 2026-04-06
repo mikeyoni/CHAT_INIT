@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
@@ -112,11 +113,52 @@ func otpsaveanddelate(otp string, user string) record {
 // otp sender
 
 func init() {
+	// Try to load .env if it exists, but don't crash if it's missing.
+	_ = godotenv.Load()
+}
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+// setupCredentials checks if GMAIL_USER and GMAIL_PASS are configured.
+// If not, it prompts interactively and saves them to .env for later runs.
+func setupCredentials() {
+	promptStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#00F5D4")).Bold(true)
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#3cff00")).Bold(true)
+	warnStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff9900")).Bold(true)
+
+	gmailUser := os.Getenv("GMAIL_USER")
+	gmailPass := os.Getenv("GMAIL_PASS")
+
+	if gmailUser != "" && gmailPass != "" {
+		return
 	}
+
+	fmt.Println(warnStyle.Render("\n SMTP credentials not found! The server needs a Gmail account to send OTP emails."))
+	fmt.Println(promptStyle.Render(" You only need to do this once; credentials will be saved locally.\n"))
+
+	reader := bufio.NewReader(os.Stdin)
+
+	if gmailUser == "" {
+		fmt.Print(promptStyle.Render(" Enter your Gmail address: "))
+		input, _ := reader.ReadString('\n')
+		gmailUser = strings.TrimSpace(input)
+	}
+
+	if gmailPass == "" {
+		fmt.Print(promptStyle.Render(" Enter your Google App Password: "))
+		input, _ := reader.ReadString('\n')
+		gmailPass = strings.TrimSpace(input)
+	}
+
+	os.Setenv("GMAIL_USER", gmailUser)
+	os.Setenv("GMAIL_PASS", gmailPass)
+
+	envContent := fmt.Sprintf("GMAIL_USER=%s\nGMAIL_PASS=%s\n", gmailUser, gmailPass)
+	if err := os.WriteFile(".env", []byte(envContent), 0600); err != nil {
+		log.Printf("warning: could not save credentials to .env: %v", err)
+		log.Println("credentials are loaded for this session but won't persist")
+		return
+	}
+
+	fmt.Println(successStyle.Render("\n Credentials saved to .env.\n"))
 }
 
 func sentOPTEmail(targetEmail string, otp string) error {
@@ -128,8 +170,8 @@ func sentOPTEmail(targetEmail string, otp string) error {
 		return nil
 	}
 
-	form := "uimikey1@gmail.com"
-	password := os.Getenv("pass")
+	form := os.Getenv("GMAIL_USER")
+	password := os.Getenv("GMAIL_PASS")
 
 	// setup smtp server settings for gmail
 	smtpHost := "smtp.gmail.com"
@@ -139,7 +181,7 @@ func sentOPTEmail(targetEmail string, otp string) error {
 
 	subject := "Subject: Pirate King Verification Code\r\n"
 
-	fromHeader := "From: uimikey1@gmail.com\r\n"
+	fromHeader := fmt.Sprintf("From: %s\r\n", form)
 	toHeader := fmt.Sprintf("To: %s\r\n", targetEmail)
 	mime := "MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";\n\n"
 
@@ -985,6 +1027,8 @@ func main() {
 	http.HandleFunc("/viewReqlist", GIveReqlist)
 
 	// http.HandleFunc("/chat-init" , long)
+
+	setupCredentials()
 
 	// server startig indicatin
 	fmt.Printf("%s", text.Render("\n\n The server is starting... \n"))
