@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"image/color"
 	"io"
 	"net/http"
 	"os"
@@ -14,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/common-nighthawk/go-figure"
 	"github.com/gorilla/websocket"
 	"github.com/joho/godotenv"
 )
@@ -34,7 +33,7 @@ func exit() {
 }
 
 var baseURL string
-var twidth int
+
 var (
 	userpromptStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00FFFF")).
@@ -80,22 +79,14 @@ var (
 		Border(lipgloss.RoundedBorder()).      // Nice rounded box
 		Padding(0, 3).                         // Space inside the box
 		MarginLeft(2)                          // Space from the left edge
-
-	boxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffff")).
-		Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
-
-	selectedboxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ff0037")).
-			BorderForeground(lipgloss.Color("#ff0059")).
-			Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
 )
 
 var yellotext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffd900"))
 var Redtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true)
 var greentext = lipgloss.NewStyle().Foreground(lipgloss.Color("#3cff00")).Bold(true)
-var purpultext = lipgloss.NewStyle().Foreground(lipgloss.Color("rgb(255, 0, 0)")).Bold(true)
-var cynetext = lipgloss.NewStyle().Foreground(lipgloss.Color("#dcbaff"))
+var purpultext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0062")).Bold(true)
+var cynetext = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ffff"))
 var wboldtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Bold(true)
-var fwboldtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Bold(true).Align(lipgloss.Right)
 
 var (
 	mytoken string
@@ -325,6 +316,8 @@ func chate(tusr string, token string, user string) {
 
 	defer conn.Close()
 
+	showModernLogo()
+
 	fmt.Print(cynetext.Render(" We are in Cannected to the server \n  ( Prss enter to Start Chat ) \n "))
 
 	done := make(chan struct{})
@@ -346,7 +339,7 @@ func chate(tusr string, token string, user string) {
 		}
 
 	}()
-	// hmm
+
 	scanner := bufio.NewScanner(os.Stdin)
 
 	for {
@@ -428,6 +421,85 @@ func todo(url, token string, user string, action string, targetuser string) {
 	fmt.Printf(" \n %v  \n", message)
 }
 
+func showModernLogo() {
+	// 1. Create a stylish box for the Title
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(lipgloss.Color("#5A189A")). // Deep Purple
+		Padding(0, 2).
+		MarginLeft(2)
+
+	// 2. Create a "Tag" for the version
+	versionStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#000000")).
+		Background(lipgloss.Color("#00F5D4")). // Neon Teal
+		Padding(0, 1)
+
+	// 3. Create a subtitle line
+	subtitle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#9D4EDD")).
+		Italic(true).
+		MarginLeft(2).
+		Render("Ship: Thousand Sunny • Location: New World")
+
+	// Combine them
+	header := lipgloss.JoinHorizontal(lipgloss.Top,
+		titleStyle.Render(" CHAT-INIT "),
+		versionStyle.Render(" v2.0 "),
+	)
+
+	fmt.Println("\n" + header)
+	fmt.Println(subtitle + "\n")
+}
+
+func showPirateLogo() {
+	poster := lipgloss.NewStyle().
+		Border(lipgloss.DoubleBorder()).
+		BorderForeground(lipgloss.Color("#E8833A")). // Bounty Gold
+		Padding(1, 4).
+		Align(lipgloss.Center).
+		Foreground(lipgloss.Color("#FAFAFA")).
+		Render("  ⚓ CHAT-INIT ⚓  \n  THE GREAT PIRATE ERA  ")
+
+	fmt.Println(poster)
+}
+
+func showBigModernLogo() {
+	// 1. Create two separate figures for the two words
+	// "block" is the boldest clean font available
+	chatFig := figure.NewFigure(" CHAT-", "block", true).String()
+	initFig := figure.NewFigure("INIT ", "block", true).String()
+
+	// 2. Create Styles for each word
+	chatStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#fff700")). // Luffy Red
+		Bold(true)
+
+	initStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00c3ff")). // Bounty Gold
+		Bold(true)
+
+	// 3. Join them horizontally so they sit on the same line
+	// This makes the logo two different colors side-by-side
+	fullLogo := lipgloss.JoinHorizontal(lipgloss.Top,
+		chatStyle.Render(chatFig),
+		initStyle.Render(initFig),
+	)
+
+	fmt.Println(fullLogo)
+
+	// 4. Subtitle with a nice border or highlight
+	subtitleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#00F5D4")).
+		Background(lipgloss.Color("#1A1A1A")). // Darker background for contrast
+		Padding(0, 1).
+		MarginLeft(4).
+		Render(" Ship: Thousand Sunny • Location: New World v2.0 by @mikeyoni < GH ")
+
+	fmt.Println(subtitleStyle)
+}
+
 func getUsername() string {
 
 	fmt.Print(userpromptStyle + arrowStyle)
@@ -470,7 +542,7 @@ func DM(url string) {
 	if mytoken != "" && myuser != "" {
 		for {
 			cls()
-
+			showBigModernLogo()
 			flist = viewflist(url)
 
 			title := "           Direct Message        \n"
@@ -550,6 +622,7 @@ func freindsetting() {
 	for {
 
 		cls()
+		showBigModernLogo()
 
 		title := " \n            Friend Manage            \n"
 		cmds := " \n 1. Add Friend  2. Delate Friend 3. Accept Friend \n 4. Reject Friend   5. Next  6. Friend list 0. Exit    \n"
@@ -729,6 +802,7 @@ func manue(url string) {
 	for {
 
 		cls()
+		showBigModernLogo()
 
 		// If globals are empty, we go straight to Login/Register
 		if mytoken == "" || myuser == "" {
@@ -802,181 +876,6 @@ func manue(url string) {
 
 var Reqlist []string
 
-type model struct {
-	Width           int
-	Hieght          int
-	Homepageoptions []string
-	choise          int
-	Homeselected    bool
-	Isselected      bool
-	IsfullScreen    bool
-	Quiting         bool
-	back            bool
-
-	// this are form home page opitons
-
-	loginpage          bool
-	registerpage       bool
-	forgetpasswordpage bool
-}
-
-func (m model) Init() tea.Cmd {
-	return nil
-}
-
-func InishialMOD() model {
-	return model{
-		Quiting:         false,
-		IsfullScreen:    true,
-		back:            false,
-		Isselected:      false,
-		Homeselected:    false,
-		Homepageoptions: []string{"Login", "Register", "Forget Password", "Exit"},
-	}
-}
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "esc", "q", "Q":
-			m.Quiting = true
-			return m, tea.Quit
-
-		case "up", "k", "K":
-			// this controles are for home page
-			if !m.Homeselected {
-				if m.choise > 0 {
-					m.choise--
-				}
-
-			}
-		case "down", "j", "J":
-			// this controles are home home page
-			if !m.Homeselected {
-				if m.choise < len(m.Homepageoptions)-1 {
-					m.choise++
-				}
-
-			}
-
-		case "enter":
-
-			if !m.Homeselected {
-				m.Homeselected = true
-			}
-
-		}
-
-	case tea.WindowSizeMsg:
-		m.Hieght = msg.Height
-		m.Width = msg.Width
-		twidth = msg.Width
-	}
-
-	// logic of home page
-
-	if m.Homeselected {
-		if m.choise == 0 {
-			m.loginpage = true
-		}
-		if m.choise == 1 {
-			m.registerpage = true
-		}
-		if m.choise == 2 {
-			m.forgetpasswordpage = true
-		}
-		if m.choise == 3 {
-
-			return m, tea.Quit
-		}
-	}
-
-	return m, nil
-}
-
-func makeGradientText(text string) string {
-
-	startColor := color.RGBA{255, 0, 98, 0}  //
-	endColor := color.RGBA{241, 229, 254, 0} // Purple
-
-	runes := []rune(text)
-	var out strings.Builder
-
-	for i, r := range runes {
-
-		f := float64(i) / float64(len(runes))
-
-		currColor := lipgloss.Color(fmt.Sprintf("#%02x%02x%02x",
-			uint8(float64(startColor.R)*(1-f)+float64(endColor.R)*f),
-			uint8(float64(startColor.G)*(1-f)+float64(endColor.G)*f),
-			uint8(float64(startColor.B)*(1-f)+float64(endColor.B)*f)))
-
-		out.WriteString(lipgloss.NewStyle().Foreground(currColor).Render(string(r)))
-	}
-	return out.String()
-}
-
-func (m model) View() string {
-
-	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
-	v := "\n your welcome to chat init \n"
-
-	subtitle := cynetext.Render("BY ui_mik3y | YT && INSTA <3 ")
-	Footther := lipgloss.NewStyle().Width(m.Width - 10).Bold(true).Align(lipgloss.Right).
-		Foreground(lipgloss.Color("#ffffff")).Render("v1.02")
-
-	l := makeGradientText(`
-		
- ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
-██╔════╝██║  ██║██╔══██╗╚══██╔══╝    ██║████╗  ██║██║╚══██╔══╝
-██║     ███████║███████║   ██║       ██║██╔██╗ ██║██║   ██║   
-██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║   
-╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║   
- ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
-                                    `)
-
-	// 	logo := fmt.Sprintf(`
-
-	//  ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
-	// ██╔════╝██║  ██║██╔══██╗╚══██╔══╝    ██║████╗  ██║██║╚══██╔══╝
-	// ██║     ███████║███████║   ██║       ██║██╔██╗ ██║██║   ██║
-	// ██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║
-	// ╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║
-	//  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝
-	//                                  %v   `, subtitle)
-
-	var render string
-
-	if !m.Homeselected {
-		render += "\n"
-		for i := range m.Homepageoptions {
-
-			if m.choise == i {
-
-				render += "\n" + selectedboxe.Render(m.Homepageoptions[i])
-
-			} else {
-
-				render += "\n" + boxe.Render(m.Homepageoptions[i])
-
-			}
-		}
-
-	}
-
-	centerContent := lipgloss.JoinVertical(
-		lipgloss.Center,
-		l+subtitle, render,
-	)
-
-	centerContent += "\n\n" + Footther
-
-	v = boxrender.Render(centerContent)
-
-	return v
-}
-
 func main() {
 
 	baseURL = "http://localhost:4040"
@@ -987,10 +886,6 @@ func main() {
 	mytoken = os.Getenv("token")
 	myuser = os.Getenv("user")
 
-	App := tea.NewProgram(InishialMOD(), tea.WithAltScreen())
-
-	if _, err := App.Run(); err != nil {
-		fmt.Printf("%v", err)
-	}
-
+	// Start the menu
+	manue(baseURL)
 }
