@@ -1,8 +1,5 @@
 
 CHAT_INIT/.env
-CLIENT/.env
-*.env
-
-# Protect database files
+RELISE/CLIENT APPLICATION/copy/.env
 CHAT_INIT/database.json
-RELISE/SERVER APPLICATION/database.json
+RELISE/CLIENT APPLICATION/copy/.env

@@ -36,5 +36,13 @@
 			"Pintu",
 			"Taplu"
 		]
+	},
+	{
+		"username": "mikey0",
+		"email": "bowiwi3017@fabaos.com",
+		"token": "bWlrZXkwOmJvd2l3aTMwMTdAZmFiYW9zLmNvbTpFREJpRGs3S1F1",
+		"passowrd": "$2a$10$68GHYDMbUFpEs2c31iuaou0xPZbPFJpWwCDPvLb4yu1EDBiDk7KQu",
+		"friendlist": null,
+		"reqestlist": null
 	}
 ]
