@@ -389,6 +389,7 @@ func chate(tusr string, token string, user string) {
 
 // ACtions SRQ for sentfriend req RFQ for refect friend req AFQ for accept firend req
 // DLF for delate form friend
+
 func todo(url, token string, user string, action string, targetuser string) {
 
 	var act string
@@ -428,30 +429,6 @@ func todo(url, token string, user string, action string, targetuser string) {
 	message := string(rebytes)
 
 	fmt.Printf(" \n %v  \n", message)
-}
-
-func getUsername() string {
-
-	fmt.Print(userpromptStyle + arrowStyle)
-
-	// 3. Take the input
-	scanner := bufio.NewScanner(os.Stdin)
-	if scanner.Scan() {
-		return scanner.Text()
-	}
-	return ""
-}
-
-func getPassword() string {
-
-	fmt.Print(passpromptStyle + REDarrowStyle)
-
-	// 3. Take the input
-	scanner := bufio.NewScanner(os.Stdin)
-	if scanner.Scan() {
-		return scanner.Text()
-	}
-	return ""
 }
 
 func getEmail() string {
@@ -514,7 +491,7 @@ func DM(url string) {
 					return
 				}
 				if choice == 111 {
-					freindsetting()
+					// freindsetting()
 					return
 				}
 
@@ -539,115 +516,8 @@ func DM(url string) {
 		}
 	} else {
 
-		manue(baseURL)
+		// manue(baseURL)
 		return
-	}
-
-}
-
-func freindsetting() {
-
-	var next bool
-
-	for {
-
-		cls()
-
-		title := " \n            Friend Manage            \n"
-		cmds := " \n 1. Add Friend  2. Delate Friend 3. Accept Friend \n 4. Reject Friend   5. Next  6. Friend list 0. Exit    \n"
-		var listVer string
-
-		Reqlist = viewReqlist(baseURL)
-		titless := greentext.Render("    Friends     ")
-		Rtitless := greentext.Render("    Requested     ")
-		Friendlist := flist
-		Reclist := Reqlist
-
-		var reqLisevew string
-
-		for i := range Friendlist {
-			listVer += fmt.Sprintf("\n • %v  \n", Friendlist[i])
-		}
-
-		for i := range Reclist {
-			reqLisevew += fmt.Sprintf("\n • %v  \n", Reclist[i])
-		}
-
-		switch next {
-		case true:
-
-			fmt.Println(texts.Render(title + texts.Render(Rtitless+wboldtext.Render(reqLisevew)) + purpultext.Render(cmds)))
-
-		default:
-
-			fmt.Println(texts.Render(title + texts.Render(titless+wboldtext.Render(listVer)) + purpultext.Render(cmds)))
-
-		}
-
-		scanner := bufio.NewScanner(os.Stdin)
-
-		fmt.Printf("%v", arrowStyle)
-
-		if scanner.Scan() {
-
-			cleanText := strings.TrimSpace(scanner.Text())
-			choice, err := strconv.Atoi(cleanText)
-
-			if err != nil {
-				fmt.Printf("\n ❌ That's not a number, %v \n", myuser)
-				time.Sleep(1 * time.Second)
-				continue
-			}
-
-			if choice == 0 {
-				DM(baseURL)
-				return
-			}
-
-			if choice > 0 && choice <= 6 {
-
-				if choice == 1 {
-					user := getUsername()
-
-					todo(baseURL, mytoken, myuser, "SRQ", user)
-				}
-
-				if choice == 2 {
-					user := getUsername()
-
-					todo(baseURL, mytoken, myuser, "DLF", user)
-				}
-
-				if choice == 3 {
-					user := getUsername()
-
-					todo(baseURL, mytoken, myuser, "AFQ", user)
-				}
-
-				if choice == 4 {
-					user := getUsername()
-
-					todo(baseURL, mytoken, myuser, "RFQ", user)
-				}
-
-				if choice == 5 {
-					next = true
-					continue
-				}
-
-				if choice == 6 {
-					next = false
-					continue
-				}
-			}
-
-		} else {
-			fmt.Println("❌ Invalid Option number!")
-			time.Sleep(1 * time.Second)
-			continue
-
-		}
-
 	}
 
 }
@@ -727,81 +597,6 @@ func viewReqlist(url string) []string {
 	return Rlist
 }
 
-func manue(url string) {
-	for {
-
-		cls()
-
-		// If globals are empty, we go straight to Login/Register
-		if mytoken == "" || myuser == "" {
-			fmt.Println(headerStyle.Render(" WELCOME TO CHAT-INIT "))
-			fmt.Println(texts.Render(" CHOOSE OPTION 0-3   \n 1. Login  \n 2. Register \n 3. Forget-password   \n 0. Exit "))
-
-			userinput := bufio.NewScanner(os.Stdin)
-			fmt.Printf("%v", cynetext.Render("  > "))
-
-			if userinput.Scan() {
-				text := strings.TrimSpace(userinput.Text())
-				switch text {
-				case "1":
-					username := getUsername()
-					password := getPassword()
-					if login(url, username, password) {
-						DM(url)
-						return
-					} else {
-						fmt.Println(Redtext.Render("\n Failed to login. Try again!"))
-						time.Sleep(1 * time.Second)
-					}
-
-				case "2":
-					username := getUsername()
-					password := getPassword()
-					email := getEmail()
-					if emailcheck(url, email, username, password) {
-
-						DM(url)
-						return
-					} else {
-						fmt.Println(Redtext.Render("\n Failed to Register"))
-						time.Sleep(1 * time.Second)
-					}
-
-				case "3":
-					email := getEmail()
-					if forgetpass(url, email) {
-						fmt.Println(greentext.Render("\n Password Reset! Login Now"))
-						time.Sleep(2 * time.Second)
-					}
-
-				case "0":
-					cls()
-					fmt.Println("Bye Bye! Have a Good Day <3")
-					os.Exit(0)
-
-				default:
-					fmt.Println("Invalid Option")
-					time.Sleep(1 * time.Second)
-				}
-			}
-		} else {
-			// We have a token saved; check if it's still good on the server
-			if tokenchekcing(url) {
-				DM(url)
-				return
-			} else {
-				// Server rejected the token (Session expired or bad data)
-				fmt.Println(Redtext.Render("! Session expired. Clearing credentials..."))
-				mytoken = ""
-				myuser = ""
-				os.Remove(".env")
-				time.Sleep(1 * time.Second)
-				continue
-			}
-		}
-	}
-}
-
 var Reqlist []string
 
 type model struct {
@@ -837,7 +632,7 @@ func (m model) Init() tea.Cmd {
 
 func InishialMOD() model {
 	ti := textinput.New()
-	ti.Placeholder = "Type your message..."
+	ti.Placeholder = "Enter Your Username "
 	ti.Focus()
 	ti.CharLimit = 150
 	ti.Width = 20
@@ -893,13 +688,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			if m.loginpage {
 				if m.iscarentinput == 0 {
+
 					m.username = m.textinput.Value()
+
 					m.textinput.SetValue("")
-					m.textinput.Placeholder = " Enter Your Password "
+					m.textinput.Placeholder = "Enter Your Password "
 					m.textinput.EchoMode = textinput.EchoPassword
 					m.iscarentinput = 1
-				} else {
+
+				} else if m.password == "" {
 					m.password = m.textinput.Value()
+					m.textinput.SetValue("")
+					m.iscarentinput++
 					return m, nil
 				}
 			}
@@ -938,7 +738,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func makeGradientText(text string) string {
 
 	startColor := color.RGBA{255, 0, 98, 0}  //
-	endColor := color.RGBA{241, 229, 254, 0} // Purple
+	endColor := color.RGBA{255, 255, 255, 0} // Purple
 
 	runes := []rune(text)
 	var out strings.Builder
@@ -1007,23 +807,31 @@ func (m model) View() string {
 
 	if m.loginpage {
 
-
 		render += "\n"
 
-		smallbox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Width(30)
+		smallbox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Width(50)
 		if m.iscarentinput == 0 {
-			render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.textinput.Value()))
+			render += smallbox.Render(wboldtext.Render(" USERNAME ", m.textinput.View()))
 
-		render += "\n"
+			render += "\n"
 
-		render += smallbox.Render(wboldtext.Render(" PASSWORD : Enter Your passord "))
+			render += smallbox.Render(wboldtext.Render(" PASSWORD : "))
 
-		} else {
+		} else if m.iscarentinput == 1 {
 			render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
 
 			render += "\n"
 
-			render += smallbox.Render(wboldtext.Render(" PASSWORD : ", m.textinput.Value()))
+			render += smallbox.Render(wboldtext.Render(" PASSWORD ", m.textinput.View()))
+
+		} else if m.iscarentinput > 1 {
+
+			render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
+
+			render += "\n"
+
+			render += smallbox.Render(wboldtext.Render(" PASSWORD : ", strings.Repeat("*", len(m.password))))
+
 		}
 
 	}
