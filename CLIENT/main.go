@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gorilla/websocket"
@@ -818,6 +820,15 @@ type model struct {
 	loginpage          bool
 	registerpage       bool
 	forgetpasswordpage bool
+
+	// to take text input
+	userinput string
+	textinput textinput.Model
+	err       error
+
+	iscarentinput int
+	username      string
+	password      string
 }
 
 func (m model) Init() tea.Cmd {
@@ -825,7 +836,14 @@ func (m model) Init() tea.Cmd {
 }
 
 func InishialMOD() model {
+	ti := textinput.New()
+	ti.Placeholder = "Type your message..."
+	ti.Focus()
+	ti.CharLimit = 150
+	ti.Width = 20
 	return model{
+		textinput:       ti,
+		err:             nil,
 		Quiting:         false,
 		IsfullScreen:    true,
 		back:            false,
@@ -834,7 +852,14 @@ func InishialMOD() model {
 		Homepageoptions: []string{"Login", "Register", "Forget Password", "Exit"},
 	}
 }
+
+func iscicked(msg tea.Msg, key string) bool {
+	k, ok := msg.(tea.KeyMsg)
+	return ok && k.String() == key
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -866,6 +891,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.Homeselected = true
 			}
 
+			if m.loginpage {
+				if m.iscarentinput == 0 {
+					m.username = m.textinput.Value()
+					m.textinput.SetValue("")
+					m.textinput.Placeholder = " Enter Your Password "
+					m.textinput.EchoMode = textinput.EchoPassword
+					m.iscarentinput = 1
+				} else {
+					m.password = m.textinput.Value()
+					return m, nil
+				}
+			}
+
 		}
 
 	case tea.WindowSizeMsg:
@@ -892,7 +930,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, nil
+	m.textinput, cmd = m.textinput.Update(msg)
+
+	return m, cmd
 }
 
 func makeGradientText(text string) string {
@@ -965,6 +1005,37 @@ func (m model) View() string {
 
 	}
 
+	if m.loginpage {
+
+
+		render += "\n"
+
+		smallbox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Width(30)
+		if m.iscarentinput == 0 {
+			render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.textinput.Value()))
+
+		render += "\n"
+
+		render += smallbox.Render(wboldtext.Render(" PASSWORD : Enter Your passord "))
+
+		} else {
+			render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
+
+			render += "\n"
+
+			render += smallbox.Render(wboldtext.Render(" PASSWORD : ", m.textinput.Value()))
+		}
+
+	}
+
+	if m.registerpage {
+
+	}
+
+	if m.forgetpasswordpage {
+
+	}
+
 	centerContent := lipgloss.JoinVertical(
 		lipgloss.Center,
 		l+subtitle, render,
@@ -975,6 +1046,7 @@ func (m model) View() string {
 	v = boxrender.Render(centerContent)
 
 	return v
+
 }
 
 func main() {
