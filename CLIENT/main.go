@@ -93,6 +93,7 @@ var (
 
 var yellotext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffd900"))
 var Redtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true)
+var warnStyle = lipgloss.NewStyle().Width(50).Align(lipgloss.Center)
 var greentext = lipgloss.NewStyle().Foreground(lipgloss.Color("#3cff00")).Bold(true)
 var purpultext = lipgloss.NewStyle().Foreground(lipgloss.Color("rgb(255, 0, 0)")).Bold(true)
 var cynetext = lipgloss.NewStyle().Foreground(lipgloss.Color("#dcbaff"))
@@ -106,8 +107,8 @@ var (
 
 // this is login function it do post login info in a url in json form package
 
-func login(url string, username string, password string) bool {
-
+func login(url string, username string, password string) (bool, string) {
+	var treturn string
 	url = fmt.Sprintf("%s/login", string(url))
 
 	data := map[string]string{
@@ -120,12 +121,10 @@ func login(url string, username string, password string) bool {
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsondata))
 
 	if err != nil {
-
-		fmt.Printf("\n Faild to sent post req : %v ", err)
-		return false
+		return false, "Network Problem Faild To Canect To Server !"
 	} else {
 
-		fmt.Printf(" \n sucessfully sented : %v ", resp.Status)
+		treturn = fmt.Sprintf(" \n sucessfully sented : %v ", resp.Status)
 	}
 
 	defer resp.Body.Close()
@@ -141,14 +140,14 @@ func login(url string, username string, password string) bool {
 		mytoken = parts[2]
 		myuser = username
 
-		return true
+		return true, treturn
 	}
 
 	if parts[0] == "not" {
 		fmt.Printf(" \n %v ", parts[1])
 	}
 
-	return false
+	return false, ""
 }
 
 // this is register function this do post register info to the srever in json form
@@ -624,6 +623,14 @@ type model struct {
 	iscarentinput int
 	username      string
 	password      string
+
+	// client side warnings
+
+	warning string
+
+	// server warnings
+
+	ServersideWarning string
 }
 
 func (m model) Init() tea.Cmd {
@@ -659,7 +666,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "esc", "q", "Q":
+
+		case "esc":
+
+			if myuser == "" || mytoken == "" {
+				m.Homeselected = false
+				m.loginpage = false
+				m.registerpage = false
+				m.forgetpasswordpage = false
+				m.warning = ""
+				m.ServersideWarning = ""
+			} 
+
+		case "q", "Q":
 			m.Quiting = true
 			return m, tea.Quit
 
@@ -687,8 +706,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if m.loginpage {
+
 				if m.iscarentinput == 0 {
 
+					m.warning = ""
 					m.username = m.textinput.Value()
 
 					m.textinput.SetValue("")
@@ -696,12 +717,48 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.textinput.EchoMode = textinput.EchoPassword
 					m.iscarentinput = 1
 
-				} else if m.password == "" {
+				} else if m.iscarentinput == 1 {
 					m.password = m.textinput.Value()
 					m.textinput.SetValue("")
 					m.iscarentinput++
+
+					if m.username != "" && m.password != "" {
+						k, warnings := login(baseURL, m.username, m.password)
+
+						if warnings != "" {
+							m.ServersideWarning = warnings
+						}
+
+						if k {
+							m.loginpage = false
+							// successfuly login
+							return m, nil
+						} else {
+							m.iscarentinput = 0
+							if m.ServersideWarning != "" {
+
+								m.warning = m.ServersideWarning
+							} else {
+
+								m.warning = "Invalid Cradenshial Try Againg . "
+
+							}
+
+							m.username = ""
+							m.password = ""
+							m.textinput.SetValue("")
+							m.textinput.Placeholder = "Enter Your Username "
+							m.textinput.EchoMode = textinput.EchoNormal
+						}
+					}
+
 					return m, nil
+				} else {
+
+					m.iscarentinput = 0
+					m.textinput.EchoMode = textinput.EchoNormal
 				}
+
 			}
 
 		}
@@ -730,7 +787,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	m.textinput, cmd = m.textinput.Update(msg)
+	if m.loginpage && (m.iscarentinput == 1 || m.iscarentinput == 0) {
+		m.textinput, cmd = m.textinput.Update(msg)
+	}
 
 	return m, cmd
 }
@@ -762,9 +821,16 @@ func (m model) View() string {
 	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
 	v := "\n your welcome to chat init \n"
 
+	Shortcut := lipgloss.NewStyle().Width((m.Width - 11 ) / 2 ).Align(lipgloss.Left).
+	Foreground(lipgloss.Color("#ffffff9b"))
+
+	Versions := lipgloss.NewStyle().Width((m.Width - 11 ) / 2 ).Align(lipgloss.Right).
+	Foreground(lipgloss.Color("#ff0000"))
+
 	subtitle := cynetext.Render("BY ui_mik3y | YT && INSTA <3 ")
-	Footther := lipgloss.NewStyle().Width(m.Width - 10).Bold(true).Align(lipgloss.Right).
-		Foreground(lipgloss.Color("#ffffff")).Render("v1.02")
+	Footther := lipgloss.NewStyle().Width(m.Width - 10).Bold(true).
+		Foreground(lipgloss.Color("#ffffff00"))
+
 
 	l := makeGradientText(`
 		
@@ -805,6 +871,8 @@ func (m model) View() string {
 
 	}
 
+	var warningRender = ""
+
 	if m.loginpage {
 
 		render += "\n"
@@ -832,6 +900,15 @@ func (m model) View() string {
 
 			render += smallbox.Render(wboldtext.Render(" PASSWORD : ", strings.Repeat("*", len(m.password))))
 
+			render += "\n"
+		}
+
+		if m.warning != "" {
+			warningRender = lipgloss.NewStyle().
+				Width(50).
+				Align(lipgloss.Center).
+				MarginTop(1). // Adds space without breaking layout
+				Render(Redtext.Render(m.warning))
 		}
 
 	}
@@ -847,9 +924,10 @@ func (m model) View() string {
 	centerContent := lipgloss.JoinVertical(
 		lipgloss.Center,
 		l+subtitle, render,
+		warningRender,
 	)
 
-	centerContent += "\n\n" + Footther
+	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit  ") , Versions.Render("v.1.02"))
 
 	v = boxrender.Render(centerContent)
 
