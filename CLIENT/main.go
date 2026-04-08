@@ -676,7 +676,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.forgetpasswordpage = false
 				m.warning = ""
 				m.ServersideWarning = ""
-			} 
+			}
 
 		case "q", "Q":
 			m.Quiting = true
@@ -821,16 +821,15 @@ func (m model) View() string {
 	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
 	v := "\n your welcome to chat init \n"
 
-	Shortcut := lipgloss.NewStyle().Width((m.Width - 11 ) / 2 ).Align(lipgloss.Left).
-	Foreground(lipgloss.Color("#ffffff9b"))
+	Shortcut := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Left).
+		Foreground(lipgloss.Color("#ffffff9b"))
 
-	Versions := lipgloss.NewStyle().Width((m.Width - 11 ) / 2 ).Align(lipgloss.Right).
-	Foreground(lipgloss.Color("#ff0000"))
+	Versions := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Right).
+		Foreground(lipgloss.Color("#ff0000"))
 
 	subtitle := cynetext.Render("BY ui_mik3y | YT && INSTA <3 ")
 	Footther := lipgloss.NewStyle().Width(m.Width - 10).Bold(true).
 		Foreground(lipgloss.Color("#ffffff00"))
-
 
 	l := makeGradientText(`
 		
@@ -927,7 +926,7 @@ func (m model) View() string {
 		warningRender,
 	)
 
-	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit  ") , Versions.Render("v.1.02"))
+	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit  "), Versions.Render("v.1.02"))
 
 	v = boxrender.Render(centerContent)
 
@@ -935,6 +934,7 @@ func (m model) View() string {
 
 }
 
+// this is where things starts
 func main() {
 
 	baseURL = "http://localhost:4040"
