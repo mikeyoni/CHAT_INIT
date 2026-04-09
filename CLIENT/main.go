@@ -100,6 +100,27 @@ var cynetext = lipgloss.NewStyle().Foreground(lipgloss.Color("#dcbaff"))
 var wboldtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Bold(true)
 var fwboldtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Bold(true).Align(lipgloss.Right)
 
+// this is the neon colur chaning mathod
+
+func getRainbowColor(step int) (int, int, int) {
+	step = step % 1530 // Keeps it in the 0-1530 range
+
+	switch {
+	case step < 255: // Red to Yellow
+		return 255, step, 0
+	case step < 510: // Yellow to Green
+		return 510 - step, 255, 0
+	case step < 765: // Green to Cyan
+		return 0, 255, step - 510
+	case step < 1020: // Cyan to Blue
+		return 0, 1020 - step, 255
+	case step < 1275: // Blue to Magenta
+		return step - 1020, 0, 255
+	default: // Magenta to Red
+		return 255, 0, 1530 - step
+	}
+}
+
 var (
 	mytoken string
 	myuser  string
@@ -631,10 +652,14 @@ type model struct {
 	// server warnings
 
 	ServersideWarning string
+
+	// for the color chaning
+
+	colorstep int
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return tick()
 }
 
 func InishialMOD() model {
@@ -663,7 +688,14 @@ func iscicked(msg tea.Msg, key string) bool {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
+	// colure chanign
+
 	switch msg := msg.(type) {
+
+	case tickMsg:
+		m.colorstep = (m.colorstep + 5) % 1530
+		return m, tick()
+
 	case tea.KeyMsg:
 		switch msg.String() {
 
@@ -794,9 +826,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func makeGradientText(text string) string {
+type tickMsg struct{}
 
-	startColor := color.RGBA{255, 0, 98, 0}  //
+func tick() tea.Cmd {
+	return tea.Tick(time.Millisecond*20, func(t time.Time) tea.Msg {
+		return tickMsg{} // Add the curly braces here!
+	})
+}
+
+func makeGradientText(text string , step int) string {
+
+	r, g, b:= getRainbowColor(step)
+
+	startColor := color.RGBA{uint8(r), uint8(g), uint8(b), 255}  //
 	endColor := color.RGBA{255, 255, 255, 0} // Purple
 
 	runes := []rune(text)
@@ -817,6 +859,9 @@ func makeGradientText(text string) string {
 }
 
 func (m model) View() string {
+
+	// inishializing rainbow color
+
 
 	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
 	v := "\n your welcome to chat init \n"
@@ -839,7 +884,7 @@ func (m model) View() string {
 ██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║   
 ╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║   
  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
-                                    `)
+                                    ` , m.colorstep * 2 )
 
 	// 	logo := fmt.Sprintf(`
 
