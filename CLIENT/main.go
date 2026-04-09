@@ -91,6 +91,18 @@ var (
 			Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
 )
 
+var (
+	// Primary Colors
+	Red    = color.RGBA{255, 0, 0, 255}
+	Green  = color.RGBA{0, 255, 0, 255}
+	Blue   = color.RGBA{0, 0, 255, 255}
+	Yellow = color.RGBA{255, 255, 0, 255}
+	Cyan   = color.RGBA{0, 255, 255, 255}
+	Pink   = color.RGBA{255, 0, 255, 255} // Also known as Magenta
+	Purple = color.RGBA{157, 0, 255, 255} // Neon Purple
+	Orange = color.RGBA{255, 136, 0, 255}
+)
+
 var yellotext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffd900"))
 var Redtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true)
 var warnStyle = lipgloss.NewStyle().Width(50).Align(lipgloss.Center)
@@ -655,7 +667,10 @@ type model struct {
 
 	// for the color chaning
 
-	colorstep int
+	colorstep        int
+	animetedlog      bool
+	currentlogoColor []string
+	currentcolor	int
 }
 
 func (m model) Init() tea.Cmd {
@@ -677,6 +692,16 @@ func InishialMOD() model {
 		Isselected:      false,
 		Homeselected:    false,
 		Homepageoptions: []string{"Login", "Register", "Forget Password", "Exit"},
+		currentlogoColor: []string{
+			"Red",
+			"Orange",
+			"Yellow",
+			"Green",
+			"Cyan",
+			"Blue",
+			"Purple",
+			"Pink",
+		},
 	}
 }
 
@@ -829,17 +854,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 type tickMsg struct{}
 
 func tick() tea.Cmd {
-	return tea.Tick(time.Millisecond*20, func(t time.Time) tea.Msg {
+	return tea.Tick(time.Millisecond*40, func(t time.Time) tea.Msg {
 		return tickMsg{} // Add the curly braces here!
 	})
 }
 
-func makeGradientText(text string , step int) string {
+func animetedmakeGradientText(text string, step int) string {
 
-	r, g, b:= getRainbowColor(step)
+	r, g, b := getRainbowColor(step)
 
-	startColor := color.RGBA{uint8(r), uint8(g), uint8(b), 255}  //
-	endColor := color.RGBA{255, 255, 255, 0} // Purple
+	startColor := color.RGBA{uint8(r), uint8(g), uint8(b), 255} //
+	endColor := color.RGBA{255, 255, 255, 0}                    // Purple
+
+	runes := []rune(text)
+	var out strings.Builder
+
+	for i, r := range runes {
+
+		f := float64(i) / float64(len(runes))
+
+		currColor := lipgloss.Color(fmt.Sprintf("#%02x%02x%02x",
+			uint8(float64(startColor.R)*(1-f)+float64(endColor.R)*f),
+			uint8(float64(startColor.G)*(1-f)+float64(endColor.G)*f),
+			uint8(float64(startColor.B)*(1-f)+float64(endColor.B)*f)))
+
+		out.WriteString(lipgloss.NewStyle().Foreground(currColor).Render(string(r)))
+	}
+	return out.String()
+}
+
+func makeGradientText(text string) string {
+
+	startColor := color.RGBA{50, 155, 0, 255} //
+	endColor := color.RGBA{255, 255, 255, 0}  // Purple
 
 	runes := []rune(text)
 	var out strings.Builder
@@ -862,7 +909,6 @@ func (m model) View() string {
 
 	// inishializing rainbow color
 
-
 	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
 	v := "\n your welcome to chat init \n"
 
@@ -876,7 +922,11 @@ func (m model) View() string {
 	Footther := lipgloss.NewStyle().Width(m.Width - 10).Bold(true).
 		Foreground(lipgloss.Color("#ffffff00"))
 
-	l := makeGradientText(`
+	var l string
+
+	if m.animetedlog {
+
+		l = animetedmakeGradientText(`
 		
  ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
 ██╔════╝██║  ██║██╔══██╗╚══██╔══╝    ██║████╗  ██║██║╚══██╔══╝
@@ -884,8 +934,21 @@ func (m model) View() string {
 ██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║   
 ╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║   
  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
-                                    ` , m.colorstep * 2 )
+                                    `, m.colorstep*2)
 
+	} else {
+
+		l = makeGradientText(`
+		
+ ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
+██╔════╝██║  ██║██╔══██╗╚══██╔══╝    ██║████╗  ██║██║╚══██╔══╝
+██║     ███████║███████║   ██║       ██║██╔██╗ ██║██║   ██║   
+██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║   
+╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║   
+ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
+                                    `)
+
+	}
 	// 	logo := fmt.Sprintf(`
 
 	//  ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
