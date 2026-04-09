@@ -86,9 +86,7 @@ var (
 	boxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffff")).
 		Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
 
-	selectedboxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ff0037")).
-			BorderForeground(lipgloss.Color("#ff0059")).
-			Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
+	
 )
 
 var (
@@ -756,7 +754,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			}
-		case "i", "I":
+		case "i", "I", "tab":
 
 			if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
 				m.currentcolor++
@@ -880,8 +878,8 @@ func animetedmakeGradientText(text string, step int, N bool) string {
 	var endColor = color.RGBA{}
 
 	if N {
-		r2, g2, b2 := getRainbowColor(step + 500) 
-    endColor = color.RGBA{uint8(r2), uint8(g2), uint8(b2), 255}
+		r2, g2, b2 := getRainbowColor(step + 500)
+		endColor = color.RGBA{uint8(g2), uint8(r2), uint8(b2), 255}
 
 	} else if !N {
 		endColor = color.RGBA{255, 255, 255, 255}
@@ -966,8 +964,46 @@ func makeGradientText(text string, colors []string, N int) string {
 }
 
 func (m model) View() string {
+	// 1. Determine the theme color based on your index
+    themeColor := "#7D56F4" // Default Purple
+    
+    if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
+        switch m.currentlogoColor[m.currentcolor] {
+        case "Red":    themeColor = "#FF0000"
+        case "Orange": themeColor = "#FF8800"
+        case "Yellow": themeColor = "#FFFF00"
+        case "Green":  themeColor = "#00FF00"
+        case "Cyan":   themeColor = "#00FFFF"
+        case "Blue":   themeColor = "#0000FF"
+        case "Purple": themeColor = "#9D00FF"
+        case "Pink":   themeColor = "#FF00FF"
+        }
+    }
 
-	// inishializing rainbow color
+    // 2. Create the dynamic selection box style
+    var selectedboxe = lipgloss.NewStyle().
+        Bold(true).
+        Foreground(lipgloss.Color(themeColor)).       // Text matches theme
+        BorderForeground(lipgloss.Color(themeColor)). // Border matches theme
+        Border(lipgloss.RoundedBorder()).
+        Width(50)
+
+	// var selectedboxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ff0037")).
+	// 		BorderForeground(lipgloss.Color("#ff0059")).
+	// 		Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
+	// // inishializing rainbow color
+
+	
+	if !m.Homeselected {
+		selectedboxe = lipgloss.NewStyle().
+        Bold(true).
+        Foreground(lipgloss.Color(themeColor)).       // Text matches theme
+        BorderForeground(lipgloss.Color(themeColor)). // Border matches theme
+        Border(lipgloss.RoundedBorder()).
+        Width(30).
+        Align(lipgloss.Center)
+	}
+
 
 	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
 	v := "\n your welcome to chat init \n"
@@ -976,7 +1012,7 @@ func (m model) View() string {
 		Foreground(lipgloss.Color("#ffffff9b"))
 
 	Versions := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Right).
-		Foreground(lipgloss.Color("#ff0000"))
+		Foreground(lipgloss.Color(themeColor))
 
 	subtitle := cynetext.Render("BY ui_mik3y | YT && INSTA <3 ")
 	Footther := lipgloss.NewStyle().Width(m.Width - 10).Bold(true).
@@ -1046,7 +1082,7 @@ func (m model) View() string {
 
 		smallbox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Width(50)
 		if m.iscarentinput == 0 {
-			render += smallbox.Render(wboldtext.Render(" USERNAME ", m.textinput.View()))
+			render += selectedboxe.Render(wboldtext.Render(" USERNAME ", m.textinput.View()))
 
 			render += "\n"
 
@@ -1057,7 +1093,7 @@ func (m model) View() string {
 
 			render += "\n"
 
-			render += smallbox.Render(wboldtext.Render(" PASSWORD ", m.textinput.View()))
+			render += selectedboxe.Render(wboldtext.Render(" PASSWORD ", m.textinput.View()))
 
 		} else if m.iscarentinput > 1 {
 
@@ -1091,10 +1127,10 @@ func (m model) View() string {
 	centerContent := lipgloss.JoinVertical(
 		lipgloss.Center,
 		l+subtitle, render,
-		warningRender,
+		warningRender,"\n",
 	)
 
-	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit  "), Versions.Render("v.1.02"))
+	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit < 'I' & 'G' "), Versions.Render("v.1.02"))
 
 	v = boxrender.Render(centerContent)
 
