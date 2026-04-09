@@ -670,7 +670,8 @@ type model struct {
 	colorstep        int
 	animetedlog      bool
 	currentlogoColor []string
-	currentcolor	int
+	currentcolor     int
+	glitchmode       bool
 }
 
 func (m model) Init() tea.Cmd {
@@ -755,7 +756,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			}
+		case "i", "I":
 
+			if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
+				m.currentcolor++
+			} else if m.currentcolor >= len(m.currentlogoColor) {
+				m.currentcolor = 0
+			}
+
+		case "Y", "y":
+			m.glitchmode = !m.glitchmode
+
+		case "g", "G":
+			m.animetedlog = !m.animetedlog
 		case "enter":
 
 			if !m.Homeselected {
@@ -859,12 +872,20 @@ func tick() tea.Cmd {
 	})
 }
 
-func animetedmakeGradientText(text string, step int) string {
+func animetedmakeGradientText(text string, step int, N bool) string {
 
 	r, g, b := getRainbowColor(step)
 
 	startColor := color.RGBA{uint8(r), uint8(g), uint8(b), 255} //
-	endColor := color.RGBA{255, 255, 255, 0}                    // Purple
+	var endColor = color.RGBA{}
+
+	if N {
+		r2, g2, b2 := getRainbowColor(step + 500) 
+    endColor = color.RGBA{uint8(r2), uint8(g2), uint8(b2), 255}
+
+	} else if !N {
+		endColor = color.RGBA{255, 255, 255, 255}
+	}
 
 	runes := []rune(text)
 	var out strings.Builder
@@ -883,18 +904,57 @@ func animetedmakeGradientText(text string, step int) string {
 	return out.String()
 }
 
-func makeGradientText(text string) string {
+func makeGradientText(text string, colors []string, N int) string {
+	// Default fallback colors (White to Grey)
+	startColor := color.RGBA{255, 255, 255, 255}
+	endColor := color.RGBA{100, 100, 100, 255}
 
-	startColor := color.RGBA{50, 155, 0, 255} //
-	endColor := color.RGBA{255, 255, 255, 0}  // Purple
+	// Safety check for index out of bounds
+	if N >= 0 && N < len(colors) {
+		switch colors[N] {
+		case "Red":
+			// Red is deep, so we fade it to a bright "Glow"
+			startColor = color.RGBA{255, 0, 0, 255}
+			endColor = color.RGBA{255, 200, 200, 255} // Fades to a light pinkish-white
+		case "Orange":
+			// Orange looks best fading into a deep burnt shadow
+			startColor = color.RGBA{255, 136, 0, 255}
+			endColor = color.RGBA{50, 20, 0, 255} // Deep "Burnt" shadow
+		case "Yellow":
+			// Yellow is the brightest, so we fade to dark to make it readable
+			startColor = color.RGBA{255, 255, 0, 255}
+			endColor = color.RGBA{40, 40, 0, 255} // Dark Olive shadow
+		case "Green":
+			// Neon Green to deep forest shadow
+			startColor = color.RGBA{0, 255, 0, 255}
+			endColor = color.RGBA{0, 30, 0, 255} // Very dark green
+		case "Cyan":
+			// Cyan is bright, so fade it to a deep ocean blue/black
+			startColor = color.RGBA{0, 255, 255, 255}
+			endColor = color.RGBA{0, 20, 40, 255} // Deep midnight blue
+		case "Blue":
+			// Blue is dark, so we make it GLOW to pure white
+			startColor = color.RGBA{0, 0, 255, 255}
+			endColor = color.RGBA{255, 255, 255, 255} // Pure White Glow
+		case "Purple":
+			// Purple to White looks incredible for a "Pirate King" vibe
+			startColor = color.RGBA{157, 0, 255, 255}
+			endColor = color.RGBA{255, 255, 255, 255} // Pure White Glow
+		case "Pink":
+			// Pink to a deep velvet shadow
+			startColor = color.RGBA{255, 0, 255, 255}
+			endColor = color.RGBA{40, 0, 40, 255} // Deep Magenta shadow
+		}
+	}
 
 	runes := []rune(text)
 	var out strings.Builder
 
 	for i, r := range runes {
-
+		// Calculate the interpolation factor (0.0 to 1.0)
 		f := float64(i) / float64(len(runes))
 
+		// Standard RGB linear interpolation math
 		currColor := lipgloss.Color(fmt.Sprintf("#%02x%02x%02x",
 			uint8(float64(startColor.R)*(1-f)+float64(endColor.R)*f),
 			uint8(float64(startColor.G)*(1-f)+float64(endColor.G)*f),
@@ -920,7 +980,7 @@ func (m model) View() string {
 
 	subtitle := cynetext.Render("BY ui_mik3y | YT && INSTA <3 ")
 	Footther := lipgloss.NewStyle().Width(m.Width - 10).Bold(true).
-		Foreground(lipgloss.Color("#ffffff00"))
+		Foreground(lipgloss.Color("rgb(0, 0, 0)"))
 
 	var l string
 
@@ -934,7 +994,7 @@ func (m model) View() string {
 ██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║   
 ╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║   
  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
-                                    `, m.colorstep*2)
+                                    `, m.colorstep*2, m.glitchmode)
 
 	} else {
 
@@ -946,7 +1006,7 @@ func (m model) View() string {
 ██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║   
 ╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║   
  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
-                                    `)
+                                    `, m.currentlogoColor, m.currentcolor)
 
 	}
 	// 	logo := fmt.Sprintf(`
