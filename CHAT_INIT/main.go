@@ -582,8 +582,14 @@ func checkup(w http.ResponseWriter, r *http.Request) {
 
 	email := incamingdats.Email
 
-	sentOPTEmail(email, otp)
+	err := sentOPTEmail(email, otp)
 
+	if err != nil {
+
+		fmt.Fprintf(w, "nosuccess")
+		return
+	}
+	
 	otpsaveanddelate(otp, incamingdats.Username)
 
 	fmt.Fprintf(w, "success")
