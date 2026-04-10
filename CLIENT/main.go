@@ -85,8 +85,6 @@ var (
 
 	boxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ffff")).
 		Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
-
-	
 )
 
 var (
@@ -132,8 +130,10 @@ func getRainbowColor(step int) (int, int, int) {
 }
 
 var (
-	mytoken string
-	myuser  string
+	mytoken        string
+	myuser         string
+	Currentcolor   string
+	Animetedcolore string
 )
 
 // this is login function it do post login info in a url in json form package
@@ -183,8 +183,8 @@ func login(url string, username string, password string) (bool, string) {
 
 // this is register function this do post register info to the srever in json form
 
-func emailcheck(url string, email string, username string, password string) bool {
-
+func emailcheck(url string, email string, username string, password string) (bool, string) {
+	var waring string
 	urle := fmt.Sprintf("%s/signup", url)
 
 	data := map[string]string{
@@ -196,17 +196,17 @@ func emailcheck(url string, email string, username string, password string) bool
 	jsondata, err := json.Marshal(data)
 	if err != nil {
 
-		msg := fmt.Sprintf("\n Faild to Marshel json data : %v ", err)
-		fmt.Print(purpultext.Render(msg))
-		return false
+		waring = fmt.Sprintf("\n Faild to Marshel json data : %v ", err)
+		return false, waring
 	}
+
 	resp, err := http.Post(urle, "application/json-data", bytes.NewBuffer(jsondata))
 
 	if err != nil {
-		msg := fmt.Sprintf("\n Faild to post register data : %v ", err)
-		fmt.Print(Redtext.Render(msg))
 
-		return false
+		waring = fmt.Sprintf("\n Faild to post register data : %v ", err)
+
+		return false, waring
 	} else {
 
 		msg := fmt.Sprintf("\n Sucessfully Posted Register data : %v ", resp.Status)
@@ -221,22 +221,23 @@ func emailcheck(url string, email string, username string, password string) bool
 	massage := string(newbytes)
 
 	if massage == "success" {
-		if register(url, email, username, password) {
-
-			return true
-		}
+		waring = "OK"
+		return true, waring
 	}
 
-	return false
+	if massage == "nosuccess" {
+		waring = "NO"
+
+	}
+
+	return false, waring
 }
+
+var userinput string
 
 func register(url string, email string, username string, password string) bool {
 
 	url = fmt.Sprintf("%s/confarmregister", url)
-
-	var userinput string
-	fmt.Print(cynetext.Render(" \n Enter the otp : "))
-	fmt.Scan(&userinput)
 
 	data := map[string]string{
 
@@ -341,6 +342,18 @@ func savecradenshial(username string, tokeen string) {
 
 	}
 
+}
+
+func savesettings(color int, animetedcolor bool) {
+	yes := "false"
+	if animetedcolor {
+		yes = "true"
+	}
+	settings := fmt.Sprintf("\ncurrentcolor=%v\nanimetedcolor=%v", color, yes)
+	err := os.WriteFile(".env", []byte(settings), 0644)
+	if err != nil {
+		fmt.Printf(" \n \n \n \n faild to save setting's: %v \n", err)
+	}
 }
 
 func chate(tusr string, token string, user string) {
@@ -651,10 +664,14 @@ type model struct {
 	textinput textinput.Model
 	err       error
 
-	iscarentinput int
-	username      string
-	password      string
-
+	Riscarentinput int
+	iscarentinput  int
+	username       string
+	password       string
+	email          string
+	needotp        bool
+	otp            int
+	logdin         bool
 	// client side warnings
 
 	warning string
@@ -677,6 +694,16 @@ func (m model) Init() tea.Cmd {
 }
 
 func InishialMOD() model {
+	var yes bool
+	var currentcolore int
+	if Currentcolor != "" || Animetedcolore != "" {
+		number, _ := strconv.Atoi(Currentcolor)
+		if Animetedcolore == "true" {
+			yes = true
+		}
+		currentcolore = number
+	}
+
 	ti := textinput.New()
 	ti.Placeholder = "Enter Your Username "
 	ti.Focus()
@@ -701,6 +728,8 @@ func InishialMOD() model {
 			"Purple",
 			"Pink",
 		},
+		currentcolor: currentcolore,
+		animetedlog:  yes,
 	}
 }
 
@@ -712,8 +741,6 @@ func iscicked(msg tea.Msg, key string) bool {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	// colure chanign
-
 	switch msg := msg.(type) {
 
 	case tickMsg:
@@ -721,70 +748,90 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tick()
 
 	case tea.KeyMsg:
+		// Logic to check if we are currently typing in a form
+		isTyping := m.loginpage || m.registerpage || m.forgetpasswordpage || m.needotp
+
 		switch msg.String() {
 
-		case "esc":
-
-			if myuser == "" || mytoken == "" {
-				m.Homeselected = false
-				m.loginpage = false
-				m.registerpage = false
-				m.forgetpasswordpage = false
-				m.warning = ""
-				m.ServersideWarning = ""
-			}
-
-		case "q", "Q":
-			m.Quiting = true
+		case "ctrl+c":
 			return m, tea.Quit
 
+		case "esc":
+			// 1. Reset all page states immediately
+			m.loginpage = false
+			m.registerpage = false
+			m.forgetpasswordpage = false
+			m.needotp = false
+			m.Homeselected = false // This lets the menu take control again
+
+			// 2. FORCE the input to stop listening
+			m.textinput.Blur()
+			m.textinput.SetValue("")
+			m.textinput.Placeholder = ""
+
+			// 3. Reset internal counters
+			m.iscarentinput = 0
+			m.Riscarentinput = 0
+			m.warning = ""
+
+			// 4. Return nil for the command to stop any pending input updates
+			return m, nil
+
+		case "q", "Q":
+			if !isTyping {
+				m.Quiting = true
+				return m, tea.Quit
+			}
+
 		case "up", "k", "K":
-			// this controles are for home page
-			if !m.Homeselected {
+			if !isTyping && !m.Homeselected {
 				if m.choise > 0 {
 					m.choise--
 				}
-
 			}
+
 		case "down", "j", "J":
-			// this controles are home home page
-			if !m.Homeselected {
+			if !isTyping && !m.Homeselected {
 				if m.choise < len(m.Homepageoptions)-1 {
 					m.choise++
 				}
-
 			}
-		case "i", "I", "tab":
 
-			if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
-				m.currentcolor++
-			} else if m.currentcolor >= len(m.currentlogoColor) {
-				m.currentcolor = 0
+		case "i", "I", "tab":
+			if !isTyping {
+				if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor)-1 {
+					m.currentcolor++
+				} else {
+					m.currentcolor = 0
+				}
+				savesettings(m.currentcolor, m.animetedlog)
 			}
 
 		case "Y", "y":
-			m.glitchmode = !m.glitchmode
+			if !isTyping {
+				m.glitchmode = !m.glitchmode
+			}
 
 		case "g", "G":
-			m.animetedlog = !m.animetedlog
-		case "enter":
+			if !isTyping {
+				m.animetedlog = !m.animetedlog
+				savesettings(m.currentcolor, m.animetedlog)
+			}
 
+		case "enter":
 			if !m.Homeselected {
 				m.Homeselected = true
 			}
 
+			// --- LOGIN LOGIC ---
 			if m.loginpage {
-
 				if m.iscarentinput == 0 {
-
 					m.warning = ""
 					m.username = m.textinput.Value()
-
 					m.textinput.SetValue("")
 					m.textinput.Placeholder = "Enter Your Password "
 					m.textinput.EchoMode = textinput.EchoPassword
 					m.iscarentinput = 1
-
 				} else if m.iscarentinput == 1 {
 					m.password = m.textinput.Value()
 					m.textinput.SetValue("")
@@ -792,43 +839,85 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					if m.username != "" && m.password != "" {
 						k, warnings := login(baseURL, m.username, m.password)
-
 						if warnings != "" {
 							m.ServersideWarning = warnings
 						}
-
 						if k {
 							m.loginpage = false
-							// successfuly login
 							return m, nil
 						} else {
 							m.iscarentinput = 0
-							if m.ServersideWarning != "" {
-
-								m.warning = m.ServersideWarning
-							} else {
-
-								m.warning = "Invalid Cradenshial Try Againg . "
-
+							m.warning = m.ServersideWarning
+							if m.warning == "" {
+								m.warning = "Invalid Credentials. Try Again."
 							}
-
 							m.username = ""
 							m.password = ""
 							m.textinput.SetValue("")
-							m.textinput.Placeholder = "Enter Your Username "
+							m.textinput.Placeholder = "Enter Your Username"
 							m.textinput.EchoMode = textinput.EchoNormal
 						}
 					}
-
 					return m, nil
-				} else {
-
-					m.iscarentinput = 0
-					m.textinput.EchoMode = textinput.EchoNormal
 				}
-
 			}
 
+			// --- REGISTER LOGIC ---
+			if m.registerpage {
+				if m.needotp {
+					otpVal := m.textinput.Value()
+					if otpVal != "" {
+						if register(baseURL, m.email, m.username, m.password) {
+							m.loginpage = false // Or your post-registration state
+						} else {
+							m.needotp = false
+							m.Riscarentinput = 0
+							m.username = ""
+							m.password = ""
+							m.textinput.SetValue("")
+							m.textinput.Placeholder = "Enter Your Username"
+							m.textinput.EchoMode = textinput.EchoNormal
+							return m, nil
+						}
+					}
+				} else {
+					if m.Riscarentinput == 0 {
+						m.warning = ""
+						m.username = m.textinput.Value()
+						m.textinput.SetValue("")
+						m.textinput.Placeholder = "Enter Your Email"
+						m.Riscarentinput = 1
+					} else if m.Riscarentinput == 1 {
+						m.warning = ""
+						m.email = m.textinput.Value()
+						m.textinput.SetValue("")
+						m.textinput.Placeholder = "Enter Your Password"
+						m.textinput.EchoMode = textinput.EchoPassword
+						m.Riscarentinput = 2
+					} else if m.Riscarentinput == 2 {
+						m.password = m.textinput.Value()
+						m.textinput.SetValue("")
+
+						ok, msg := emailcheck(baseURL, m.email, m.username, m.password)
+						if msg != "" {
+							m.warning = msg
+						}
+						if ok {
+							m.warning = ""
+							m.needotp = true
+							m.textinput.Placeholder = "Enter Your OTP"
+							m.textinput.EchoMode = textinput.EchoNormal
+							m.Riscarentinput++
+						} else {
+							m.textinput.EchoMode = textinput.EchoNormal
+							m.warning = "Failed to send OTP. Try again."
+							m.Riscarentinput = 0
+							m.textinput.Placeholder = "Enter Your Username"
+						}
+					}
+					return m, nil
+				}
+			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -837,29 +926,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		twidth = msg.Width
 	}
 
-	// logic of home page
-
-	if m.Homeselected {
-		if m.choise == 0 {
+	// Menu Selection Logic
+	if m.Homeselected && !m.loginpage && !m.registerpage && !m.forgetpasswordpage {
+		switch m.choise {
+		case 0:
 			m.loginpage = true
-		}
-		if m.choise == 1 {
+		case 1:
 			m.registerpage = true
-		}
-		if m.choise == 2 {
+		case 2:
 			m.forgetpasswordpage = true
-		}
-		if m.choise == 3 {
-
+		case 3:
 			return m, tea.Quit
 		}
 	}
 
-	if m.loginpage && (m.iscarentinput == 1 || m.iscarentinput == 0) {
+	// Ensure the text input actually processes characters
+	if m.loginpage || m.registerpage || m.forgetpasswordpage || m.needotp {
+		m.textinput.Focus()
 		m.textinput, cmd = m.textinput.Update(msg)
+	} else {
+		// If no forms are open, the cursor should be off
+		m.textinput.Blur()
 	}
 
 	return m, cmd
+
 }
 
 type tickMsg struct{}
@@ -903,6 +994,7 @@ func animetedmakeGradientText(text string, step int, N bool) string {
 }
 
 func makeGradientText(text string, colors []string, N int) string {
+
 	// Default fallback colors (White to Grey)
 	startColor := color.RGBA{255, 255, 255, 255}
 	endColor := color.RGBA{100, 100, 100, 255}
@@ -964,46 +1056,78 @@ func makeGradientText(text string, colors []string, N int) string {
 }
 
 func (m model) View() string {
-	// 1. Determine the theme color based on your index
-    themeColor := "#7D56F4" // Default Purple
-    
-    if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
-        switch m.currentlogoColor[m.currentcolor] {
-        case "Red":    themeColor = "#FF0000"
-        case "Orange": themeColor = "#FF8800"
-        case "Yellow": themeColor = "#FFFF00"
-        case "Green":  themeColor = "#00FF00"
-        case "Cyan":   themeColor = "#00FFFF"
-        case "Blue":   themeColor = "#0000FF"
-        case "Purple": themeColor = "#9D00FF"
-        case "Pink":   themeColor = "#FF00FF"
-        }
-    }
 
-    // 2. Create the dynamic selection box style
-    var selectedboxe = lipgloss.NewStyle().
-        Bold(true).
-        Foreground(lipgloss.Color(themeColor)).       // Text matches theme
-        BorderForeground(lipgloss.Color(themeColor)). // Border matches theme
-        Border(lipgloss.RoundedBorder()).
-        Width(50)
+	var themeColor string
+
+	if m.animetedlog {
+		// This pulls the EXACT color from your rainbow math
+		r, g, b := getRainbowColor(m.colorstep * 2)
+		themeColor = fmt.Sprintf("#%02x%02x%02x", r, g, b)
+
+	} else {
+		// Standard static color logic
+		themeColor = "#7D56F4" // Default
+		if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
+			switch m.currentlogoColor[m.currentcolor] {
+			case "Red":
+				themeColor = "#FF0000"
+			case "Orange":
+				themeColor = "#FF8800"
+			case "Yellow":
+				themeColor = "#FFFF00"
+			case "Green":
+				themeColor = "#00FF00"
+			case "Cyan":
+				themeColor = "#00FFFF"
+			case "Blue":
+				themeColor = "#0000FF"
+			case "Purple":
+				themeColor = "#9D00FF"
+			case "Pink":
+				themeColor = "#FF00FF"
+			}
+		}
+	}
+
+	// if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
+	//     switch m.currentlogoColor[m.currentcolor] {
+	//     case "Red":    themeColor = "#FF0000"
+	//     case "Orange": themeColor = "#FF8800"
+	//     case "Yellow": themeColor = "#FFFF00"
+	//     case "Green":  themeColor = "#00FF00"
+	//     case "Cyan":   themeColor = "#00FFFF"
+	//     case "Blue":   themeColor = "#0000FF"
+	//     case "Purple": themeColor = "#9D00FF"
+	//     case "Pink":   themeColor = "#FF00FF"
+	//     }
+	// }
+
+	// 2. Create the dynamic selection box style
+	var selectedboxe = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(themeColor)).
+		BorderForeground(lipgloss.Color(themeColor)).
+		Border(lipgloss.RoundedBorder()).
+		Width(50)
+
+	// Update the version text color too!
+	Versions := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Right).
+		Foreground(lipgloss.Color(themeColor))
 
 	// var selectedboxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ff0037")).
 	// 		BorderForeground(lipgloss.Color("#ff0059")).
 	// 		Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
 	// // inishializing rainbow color
 
-	
 	if !m.Homeselected {
 		selectedboxe = lipgloss.NewStyle().
-        Bold(true).
-        Foreground(lipgloss.Color(themeColor)).       // Text matches theme
-        BorderForeground(lipgloss.Color(themeColor)). // Border matches theme
-        Border(lipgloss.RoundedBorder()).
-        Width(30).
-        Align(lipgloss.Center)
+			Bold(true).
+			Foreground(lipgloss.Color(themeColor)).       // Text matches theme
+			BorderForeground(lipgloss.Color(themeColor)). // Border matches theme
+			Border(lipgloss.RoundedBorder()).
+			Width(30).
+			Align(lipgloss.Center)
 	}
-
 
 	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
 	v := "\n your welcome to chat init \n"
@@ -1011,8 +1135,8 @@ func (m model) View() string {
 	Shortcut := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Left).
 		Foreground(lipgloss.Color("#ffffff9b"))
 
-	Versions := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Right).
-		Foreground(lipgloss.Color(themeColor))
+	// Versions := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Right).
+	// 	Foreground(lipgloss.Color(themeColor))
 
 	subtitle := cynetext.Render("BY ui_mik3y | YT && INSTA <3 ")
 	Footther := lipgloss.NewStyle().Width(m.Width - 10).Bold(true).
@@ -1117,7 +1241,71 @@ func (m model) View() string {
 	}
 
 	if m.registerpage {
+		render += "\n"
 
+		smallbox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Width(50)
+
+		if m.needotp {
+
+			render += wboldtext.Render("Enter The OTP We Sented On : ", m.email)
+			render += "\n"
+			render += selectedboxe.Render(wboldtext.Render(" OTP ", m.textinput.View()))
+
+		}
+
+		if !m.needotp {
+
+			if m.Riscarentinput == 0 {
+				render += selectedboxe.Render(wboldtext.Render(" USERNAME ", m.textinput.View()))
+
+				render += "\n"
+
+				render += smallbox.Render(wboldtext.Render(" EMAIL : "))
+
+				render += "\n"
+
+				render += smallbox.Render(wboldtext.Render(" PASSWORD : "))
+
+			} else if m.Riscarentinput == 1 {
+				render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
+				render += "\n"
+
+				render += selectedboxe.Render(wboldtext.Render(" EMAIL ", m.textinput.View()))
+				render += "\n"
+
+				render += smallbox.Render(wboldtext.Render(" PASSWORD "))
+
+			} else if m.Riscarentinput == 2 {
+				render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
+				render += "\n"
+
+				render += smallbox.Render(wboldtext.Render(" EMAIL : ", m.email))
+				render += "\n"
+
+				render += selectedboxe.Render(wboldtext.Render(" PASSWORD ", m.textinput.View()))
+
+			} else if m.Riscarentinput > 2 {
+
+				render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
+				render += "\n"
+
+				render += smallbox.Render(wboldtext.Render(" EMAIL : ", m.email))
+				render += "\n"
+
+				render += smallbox.Render(wboldtext.Render(" PASSWORD : ", strings.Repeat("*", len(m.password))))
+				render += "\n"
+
+			}
+
+			if m.warning != "" {
+
+				warningRender = lipgloss.NewStyle().
+					Width(50).
+					Align(lipgloss.Center).
+					MarginTop(1). // Adds space without breaking layout
+					Render(Redtext.Render(m.warning))
+			}
+		}
 	}
 
 	if m.forgetpasswordpage {
@@ -1127,7 +1315,7 @@ func (m model) View() string {
 	centerContent := lipgloss.JoinVertical(
 		lipgloss.Center,
 		l+subtitle, render,
-		warningRender,"\n",
+		warningRender, "\n",
 	)
 
 	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit < 'I' & 'G' "), Versions.Render("v.1.02"))
@@ -1148,6 +1336,8 @@ func main() {
 
 	mytoken = os.Getenv("token")
 	myuser = os.Getenv("user")
+	Currentcolor = os.Getenv("currentcolor")
+	Animetedcolore = os.Getenv("animetedcolor")
 
 	App := tea.NewProgram(InishialMOD(), tea.WithAltScreen())
 
