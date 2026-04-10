@@ -672,6 +672,7 @@ type model struct {
 	needotp        bool
 	otp            int
 	logdin         bool
+	recoveryEail   string
 	// client side warnings
 
 	warning string
@@ -778,6 +779,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "q", "Q":
+
 			if !isTyping {
 				m.Quiting = true
 				return m, tea.Quit
@@ -917,6 +919,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, nil
 				}
+			}
+
+			// forget pass
+
+			if m.forgetpasswordpage {
+				
 			}
 		}
 
@@ -1129,7 +1137,9 @@ func (m model) View() string {
 			Align(lipgloss.Center)
 	}
 
-	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
+	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color(themeColor)).
+		Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
 	v := "\n your welcome to chat init \n"
 
 	Shortcut := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Left).
@@ -1309,6 +1319,11 @@ func (m model) View() string {
 	}
 
 	if m.forgetpasswordpage {
+		render += "\n"
+		render += "\n"
+		render += wboldtext.Render("Enter Your Recovery Email")
+		render += "\n"
+		render += selectedboxe.Render(" Email : ")
 
 	}
 
