@@ -288,8 +288,7 @@ func register(url string, email string, username string, password string) bool {
 }
 
 // forget password
-
-func forgetpass(baseURL string, email string) bool {
+func (m model) forgetpass(baseURL string, email string) bool {
 	// 1. REQUEST THE OTP
 	url := fmt.Sprintf("%s/forgetpass", baseURL)
 	data := map[string]string{"email": email}
@@ -307,12 +306,8 @@ func forgetpass(baseURL string, email string) bool {
 	if parts[0] == "done" {
 		fmt.Printf("\n %s", parts[1])
 
-		var otpInput string
-		var newPassInput string
-		fmt.Printf("\n Enter OTP: ")
-		fmt.Scan(&otpInput)
-		fmt.Printf("\n Enter New Password: ")
-		fmt.Scan(&newPassInput)
+		otpInput := <-m.otpChan
+		newPassInput := <-m.passChan
 
 		resetURL := fmt.Sprintf("%s/forgetpass?otp=%s&user=%s&new=%s", baseURL, otpInput, email, newPassInput)
 
@@ -673,6 +668,12 @@ type model struct {
 	otp            int
 	logdin         bool
 	recoveryEail   string
+	recoveryOTP    bool
+
+	otpChan  chan string
+	passChan chan string
+
+	forgetpasswordSteps int
 	// client side warnings
 
 	warning string
@@ -737,6 +738,10 @@ func InishialMOD() model {
 func iscicked(msg tea.Msg, key string) bool {
 	k, ok := msg.(tea.KeyMsg)
 	return ok && k.String() == key
+}
+
+type forgetResultMsg struct {
+	success bool
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -924,7 +929,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// forget pass
 
 			if m.forgetpasswordpage {
-				
+
+				if m.forgetpasswordSteps == 0 {
+
+					m.recoveryEail = m.textinput.Value()
+					m.textinput.SetValue("")
+					m.textinput.Placeholder = "OTP"
+					m.forgetpasswordSteps = 1
+
+					return m, func() tea.Msg {
+						success := m.forgetpass(baseURL, m.recoveryEail)
+						return forgetResultMsg{success: success}
+					}
+
+				} else if m.forgetpasswordSteps == 1 {
+					m.otpChan <- m.textinput.Value()
+
+					m.textinput.SetValue("")
+					m.textinput.Placeholder = " New Password"
+					m.forgetpasswordSteps = 2
+
+				} else if m.forgetpasswordSteps == 2 {
+					m.passChan <- m.textinput.Value()
+					m.textinput.SetValue("")
+					m.forgetpasswordpage = false
+				}
+
+				return m, nil
+
 			}
 		}
 
@@ -932,6 +964,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Hieght = msg.Height
 		m.Width = msg.Width
 		twidth = msg.Width
+
+	case forgetResultMsg:
+		if msg.success {
+			m.forgetpasswordpage = false
+			m.Homeselected = false
+			m.warning = "Password Reset Successfully ! "
+
+		} else {
+			m.forgetpasswordSteps = 0
+			m.warning = "Faild to recover. Try again. "
+		}
+		return m, nil
 	}
 
 	// Menu Selection Logic
@@ -943,6 +987,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.registerpage = true
 		case 2:
 			m.forgetpasswordpage = true
+			m.textinput.Placeholder = "Enter Your Email"
+			m.otpChan = make(chan string)
+			m.passChan = make(chan string)
+
 		case 3:
 			return m, tea.Quit
 		}
@@ -1319,11 +1367,32 @@ func (m model) View() string {
 	}
 
 	if m.forgetpasswordpage {
-		render += "\n"
-		render += "\n"
-		render += wboldtext.Render("Enter Your Recovery Email")
-		render += "\n"
-		render += selectedboxe.Render(" Email : ")
+
+		switch m.forgetpasswordSteps {
+		case 0:
+			render += "\n"
+			render += "\n"
+			render += wboldtext.Render("Enter Your Recovery Email")
+			render += "\n"
+			render += selectedboxe.Render(" Email ", m.textinput.View())
+
+		case 1:
+
+			render += "\n"
+			render += "\n"
+			render += wboldtext.Render("Enter Your OTP ")
+			render += "\n"
+			render += selectedboxe.Render(" OTP ", m.textinput.View())
+
+		case 2:
+
+			render += "\n"
+			render += "\n"
+			render += wboldtext.Render("Enter Your New Password ")
+			render += "\n"
+			render += selectedboxe.Render(" Password ", m.textinput.View())
+
+		}
 
 	}
 
