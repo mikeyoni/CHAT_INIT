@@ -288,8 +288,8 @@ func register(url string, email string, username string, password string) bool {
 }
 
 // forget password
-func (m model) forgetpass(baseURL string, email string) bool {
-	// 1. REQUEST THE OTP
+
+func sentforgetpassreq(email string) bool {
 	url := fmt.Sprintf("%s/forgetpass", baseURL)
 	data := map[string]string{"email": email}
 	jsondata, _ := json.Marshal(data)
@@ -304,25 +304,36 @@ func (m model) forgetpass(baseURL string, email string) bool {
 	parts := strings.Split(string(body), ":")
 
 	if parts[0] == "done" {
-		fmt.Printf("\n %s", parts[1])
-
-		otpInput := <-m.otpChan
-		newPassInput := <-m.passChan
-
-		resetURL := fmt.Sprintf("%s/forgetpass?otp=%s&user=%s&new=%s", baseURL, otpInput, email, newPassInput)
-
-		resp2, err := http.Post(resetURL, "application/json", nil)
-		if err != nil {
-			return false
-		}
-		defer resp2.Body.Close()
-
-		finalBody, _ := io.ReadAll(resp2.Body)
-		fmt.Printf("\n Final Result: %s", string(finalBody))
 		return true
 	}
 
 	return false
+}
+
+func (m model) forgetpass(newpass string) bool {
+
+	otpInput := m.otp
+	newPassInput := newpass
+
+	resetURL := fmt.Sprintf("%s/forgetpass?otp=%s&user=%s&new=%s", baseURL, otpInput, m.email, newPassInput)
+
+	resp2, err := http.Post(resetURL, "application/json", nil)
+	if err != nil {
+		return false
+	}
+
+	defer resp2.Body.Close()
+
+	finalBody, _ := io.ReadAll(resp2.Body)
+	parts := strings.Split(string(finalBody), ":")
+
+	if parts[0] == "success" {
+
+		return true
+	}
+
+	return false
+
 }
 
 func savecradenshial(username string, tokeen string) {
@@ -659,20 +670,17 @@ type model struct {
 	textinput textinput.Model
 	err       error
 
-	Riscarentinput int
-	iscarentinput  int
-	username       string
-	password       string
-	email          string
-	needotp        bool
-	otp            int
-	logdin         bool
-	recoveryEail   string
-	recoveryOTP    bool
-
-	otpChan  chan string
-	passChan chan string
-
+	Riscarentinput      int
+	iscarentinput       int
+	username            string
+	password            string
+	email               string
+	needotp             bool
+	otp                 string
+	logdin              bool
+	recoveryEail        string
+	recoveryOTP         bool
+	NewPass             string
 	forgetpasswordSteps int
 	// client side warnings
 
@@ -937,22 +945,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.textinput.Placeholder = "OTP"
 					m.forgetpasswordSteps = 1
 
-					return m, func() tea.Msg {
-						success := m.forgetpass(baseURL, m.recoveryEail)
-						return forgetResultMsg{success: success}
+					if sentforgetpassreq(m.recoveryEail) {
+						m.warning = fmt.Sprintf("SuccessFully Otp Send To : ", m.recoveryEail)
 					}
 
 				} else if m.forgetpasswordSteps == 1 {
-					m.otpChan <- m.textinput.Value()
-
+					m.otp = m.textinput.Value()
 					m.textinput.SetValue("")
 					m.textinput.Placeholder = " New Password"
 					m.forgetpasswordSteps = 2
 
 				} else if m.forgetpasswordSteps == 2 {
-					m.passChan <- m.textinput.Value()
+					m.NewPass = m.textinput.Value()
 					m.textinput.SetValue("")
-					m.forgetpasswordpage = false
+
+					// Create a copy of the values so they don't change while the request runs
+					newPass := m.NewPass
+					email := m.recoveryEail
+					otp := m.otp
+
+					// Return a command! This runs in the background.
+					return m, func() tea.Msg {
+						// Build the URL manually here to ensure it's clean
+						resetURL := fmt.Sprintf("%s/forgetpass?otp=%s&user=%s&new=%s", baseURL, otp, email, newPass)
+						resp, err := http.Post(resetURL, "application/json", nil)
+
+						if err != nil {
+							return forgetResultMsg{success: false}
+						}
+						defer resp.Body.Close()
+
+						body, _ := io.ReadAll(resp.Body)
+						// Check if server returned "success"
+						if strings.HasPrefix(string(body), "success") {
+							return forgetResultMsg{success: true}
+						}
+						return forgetResultMsg{success: false}
+					}
 				}
 
 				return m, nil
@@ -970,6 +999,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.forgetpasswordpage = false
 			m.Homeselected = false
 			m.warning = "Password Reset Successfully ! "
+			m.forgetpasswordSteps = 0
 
 		} else {
 			m.forgetpasswordSteps = 0
@@ -988,9 +1018,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case 2:
 			m.forgetpasswordpage = true
 			m.textinput.Placeholder = "Enter Your Email"
-			m.otpChan = make(chan string)
-			m.passChan = make(chan string)
-
 		case 3:
 			return m, tea.Quit
 		}
@@ -1367,33 +1394,52 @@ func (m model) View() string {
 	}
 
 	if m.forgetpasswordpage {
+		// render += "\n"
+		// render += "\n"
+		// render += wboldtext.Render(" THIS OPTION IS UNDER WORK :D ")
+		render += "\n"
 
 		switch m.forgetpasswordSteps {
 		case 0:
 			render += "\n"
-			render += "\n"
-			render += wboldtext.Render("Enter Your Recovery Email")
+			render += wboldtext.Render(" Enter Your Recovery Email ")
 			render += "\n"
 			render += selectedboxe.Render(" Email ", m.textinput.View())
+			render += "\n"
 
 		case 1:
-
 			render += "\n"
-			render += "\n"
-			render += wboldtext.Render("Enter Your OTP ")
+			render += wboldtext.Render(" Enter Your OTP on : ", m.recoveryEail)
 			render += "\n"
 			render += selectedboxe.Render(" OTP ", m.textinput.View())
+			render += "\n"
 
 		case 2:
-
 			render += "\n"
+			render += wboldtext.Render(" Enter Your New Paword ")
 			render += "\n"
-			render += wboldtext.Render("Enter Your New Password ")
+			render += selectedboxe.Render(" PASSWORD ", m.textinput.View())
 			render += "\n"
-			render += selectedboxe.Render(" Password ", m.textinput.View())
-
 		}
 
+		if m.warning != "" {
+
+			warningRender = lipgloss.NewStyle().
+				Width(50).
+				Align(lipgloss.Center).
+				MarginTop(1). // Adds space without breaking layout
+				Render(Redtext.Render(m.warning))
+		}
+
+	}
+
+	if m.warning != "" {
+
+		warningRender = lipgloss.NewStyle().
+			Width(50).
+			Align(lipgloss.Center).
+			MarginTop(1). // Adds space without breaking layout
+			Render(Redtext.Render(m.warning))
 	}
 
 	centerContent := lipgloss.JoinVertical(
