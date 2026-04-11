@@ -519,30 +519,23 @@ func login(w http.ResponseWriter, r *http.Request) {
 	// checking the user name is in data base or not
 
 	for _, user := range jsondata {
-
 		if user.UserName == incamingdata.Username {
-
 			userfound = true
 			passwordfund = Compareshass(incamingdata.Password, user.Password)
 			if passwordfund {
-				usertoke := user.Token
-				fmt.Fprintf(w, "success:token:%s", usertoke)
+				fmt.Fprintf(w, "success:token:%s", user.Token)
+				return // FIX: Stop execution here
+			} else {
+				fmt.Fprintf(w, "not:Invalid Password")
+				return // FIX: Stop execution here
 			}
-			if !passwordfund {
-				fmt.Fprintf(w, "not:Password not match")
-			}
-			break
-
 		}
-
 	}
 
 	if !userfound {
-		fmt.Fprintf(w, " user not found ")
-	} else if !passwordfund {
-		fmt.Fprintf(w, " passsowrd not found ")
+		fmt.Fprintf(w, "not:User Not Found") // FIX: Use 'not:' prefix
+		return
 	}
-
 	fmt.Printf(" %+v ", incamingdata)
 
 }
@@ -589,7 +582,7 @@ func checkup(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "nosuccess")
 		return
 	}
-	
+
 	otpsaveanddelate(otp, incamingdats.Username)
 
 	fmt.Fprintf(w, "success")
@@ -676,7 +669,7 @@ func forgetpass(w http.ResponseWriter, r *http.Request) {
 						isdone := saveuserdata(userdatas)
 
 						if isdone {
-							fmt.Fprintf(w, " successfully reset password ")
+							fmt.Print(" successfully reset password ")
 						}
 						break
 
@@ -686,8 +679,7 @@ func forgetpass(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "success:Password has been reset")
 				return // STOP HERE! Don't send another OTP.
 			}
-			fmt.Fprintf(w, "done:OTP is valid, please provide new pass")
-			return
+
 		}
 		fmt.Fprintf(w, "error:Invalid or expired OTP")
 		return
