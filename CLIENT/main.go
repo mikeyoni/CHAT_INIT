@@ -139,7 +139,7 @@ var (
 // this is login function it do post login info in a url in json form package
 
 func login(url string, username string, password string) (bool, string) {
-	var treturn string
+
 	url = fmt.Sprintf("%s/login", string(url))
 
 	data := map[string]string{
@@ -153,9 +153,6 @@ func login(url string, username string, password string) (bool, string) {
 
 	if err != nil {
 		return false, "Network Problem Faild To Canect To Server !"
-	} else {
-
-		treturn = fmt.Sprintf(" \n sucessfully sented : %v ", resp.Status)
 	}
 
 	defer resp.Body.Close()
@@ -165,20 +162,19 @@ func login(url string, username string, password string) (bool, string) {
 
 	parts := strings.Split(massage, ":")
 
-	if len(parts) > 0 && parts[0] == "success" {
-
+	// ... after strings.Split ...
+	if len(parts) >= 3 && parts[0] == "success" {
 		savecradenshial(username, parts[2])
 		mytoken = parts[2]
 		myuser = username
-
-		return true, treturn
+		return true, "Login Successful"
 	}
 
-	if parts[0] == "not" {
-		fmt.Printf(" \n %v ", parts[1])
+	if len(parts) >= 2 && parts[0] == "not" {
+		return false, parts[1] // Return the actual error message
 	}
 
-	return false, ""
+	return false, "Unknown Server Error"
 }
 
 // this is register function this do post register info to the srever in json form
@@ -356,7 +352,7 @@ func savesettings(color int, animetedcolor bool) {
 		yes = "true"
 	}
 	settings := fmt.Sprintf("\ncurrentcolor=%v\nanimetedcolor=%v", color, yes)
-	err := os.WriteFile(".env", []byte(settings), 0644)
+	err := os.WriteFile(".setings", []byte(settings), 0644)
 	if err != nil {
 		fmt.Printf(" \n \n \n \n faild to save setting's: %v \n", err)
 	}
@@ -577,13 +573,24 @@ func tokenchekcing(url string) bool {
 		return false
 	}
 
+	// var resp *http.Response
+
 	url = fmt.Sprintf("%v/checking?token=%s", url, mytoken)
 
-	resp, _ := http.Post(url, "application/checking", nil)
+	resp, err := http.Post(url, "application/checking", nil)
 
-	replaybyte, _ := io.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
 
-	replay := string(replaybyte)
+	replaybyte, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		return false
+	}
+
+	replay := ""
+	replay = string(replaybyte)
 
 	if replay == "ok" {
 		return true
@@ -649,6 +656,7 @@ func viewReqlist(url string) []string {
 var Reqlist []string
 
 type model struct {
+	loggedin        bool
 	Width           int
 	Hieght          int
 	Homepageoptions []string
@@ -677,7 +685,6 @@ type model struct {
 	email               string
 	needotp             bool
 	otp                 string
-	logdin              bool
 	recoveryEail        string
 	recoveryOTP         bool
 	NewPass             string
@@ -752,9 +759,26 @@ type forgetResultMsg struct {
 	success bool
 }
 
+var I = 0
+var ISlogedin bool
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
+	if !m.loggedin && I < 3 {
+		I++
+		if tokenchekcing(baseURL) {
+			ISlogedin = true
+			return m , tea.Quit
+		}
+	}
+
+	if m.loggedin {
+		m.Homeselected = true
+		m.loginpage = false
+		m.registerpage = false
+		m.forgetpasswordpage = false
+	}
 	switch msg := msg.(type) {
 
 	case tickMsg:
@@ -859,6 +883,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						if k {
 							m.loginpage = false
+							m.loggedin = true
 							return m, nil
 						} else {
 							m.iscarentinput = 0
@@ -1000,6 +1025,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Homeselected = false
 			m.warning = "Password Reset Successfully ! "
 			m.forgetpasswordSteps = 0
+			m.loginpage = true
 
 		} else {
 			m.forgetpasswordSteps = 0
@@ -1229,7 +1255,7 @@ func (m model) View() string {
 
 	var l string
 
-	if m.animetedlog {
+	if m.animetedlog  {
 
 		l = animetedmakeGradientText(`
 		
@@ -1253,7 +1279,7 @@ func (m model) View() string {
  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
                                     `, m.currentlogoColor, m.currentcolor)
 
-	}
+	} 
 	// 	logo := fmt.Sprintf(`
 
 	//  ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
@@ -1433,14 +1459,14 @@ func (m model) View() string {
 
 	}
 
-	if m.warning != "" {
+	// if m.warning != "" {
 
-		warningRender = lipgloss.NewStyle().
-			Width(50).
-			Align(lipgloss.Center).
-			MarginTop(1). // Adds space without breaking layout
-			Render(Redtext.Render(m.warning))
-	}
+	// 	warningRender = lipgloss.NewStyle().
+	// 		Width(50).
+	// 		Align(lipgloss.Center).
+	// 		MarginTop(1). // Adds space without breaking layout
+	// 		Render(Redtext.Render(m.warning))
+	// }
 
 	centerContent := lipgloss.JoinVertical(
 		lipgloss.Center,
@@ -1463,9 +1489,10 @@ func main() {
 
 	// Try to load. If it fails (file deleted), mytoken/myuser will stay empty ""
 	godotenv.Load(".env")
-
 	mytoken = os.Getenv("token")
 	myuser = os.Getenv("user")
+
+	godotenv.Load(".setings")
 	Currentcolor = os.Getenv("currentcolor")
 	Animetedcolore = os.Getenv("animetedcolor")
 
