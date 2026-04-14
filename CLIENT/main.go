@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -306,7 +307,7 @@ func sentforgetpassreq(email string) bool {
 	return false
 }
 
-func (m model) forgetpass(newpass string) bool {
+func (m LoginPageView) forgetpass(newpass string) bool {
 
 	otpInput := m.otp
 	newPassInput := newpass
@@ -655,7 +656,122 @@ func viewReqlist(url string) []string {
 
 var Reqlist []string
 
-type model struct {
+type seasionState int
+
+const (
+	LoginState      seasionState = iota // 0
+	DashState                           // 1
+	SettingState                        // 2
+	FriendlistState                     // 3
+	DirectMsgState                      // 4 <--- Add this
+)
+
+type rootModel struct {
+	islogedin    bool
+	loginAttampt int
+	state        seasionState
+	login        LoginPageView
+	dash         DashboardView
+	friendlist   FriendlistView
+	settings     SettingsView
+	directmsg    DirectMsgView // <--- Add this
+}
+
+func (m rootModel) Init() tea.Cmd {
+	return m.login.Init()
+}
+
+// Global struct to hold terminal dimensions
+var WinSize = struct {
+	Width  int
+	Height int
+}{}
+
+func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var newModel tea.Model
+
+	// 1. GLOBAL WINDOW RESIZE (Safe)
+	if msg, ok := msg.(tea.WindowSizeMsg); ok {
+		WinSize.Width = msg.Width
+		WinSize.Height = msg.Height
+	}
+
+	// 2. TOKEN CHECK (Restored)
+	if !m.islogedin && m.loginAttampt < 3 {
+		if tokenchekcing(baseURL) {
+			m.islogedin = true
+			m.state = DashState
+			return m, m.dash.Init()
+		}
+	}
+
+	// 3. SAFE STATE SWITCHING
+	// We use "ctrl+o", "ctrl+s", etc. so typing normally doesn't break the app
+	if msg, ok := msg.(tea.KeyMsg); ok {
+		switch msg.String() {
+		case "ctrl+o":
+			m.state = FriendlistState
+			return m, nil
+		case "ctrl+s":
+			m.state = SettingState
+			return m, nil
+		case "ctrl+d":
+			m.state = DashState
+			return m, nil
+		}
+	}
+
+	// 4. ROUTING (The rest stays exactly the same)
+	switch m.state {
+	case LoginState:
+		newModel, cmd = m.login.Update(msg)
+		m.login = newModel.(LoginPageView)
+		if m.login.loggedin {
+			m.state = DashState
+			return m, m.dash.Init()
+		}
+
+	case DashState:
+		newModel, cmd = m.dash.Update(msg)
+		m.dash = newModel.(DashboardView)
+
+	case FriendlistState:
+		newModel, cmd = m.friendlist.Update(msg)
+		m.friendlist = newModel.(FriendlistView)
+
+	case SettingState:
+		newModel, cmd = m.settings.Update(msg)
+		m.settings = newModel.(SettingsView)
+
+	case DirectMsgState:
+		newModel, cmd = m.directmsg.Update(msg)
+		m.directmsg = newModel.(DirectMsgView)
+	}
+
+	return m, cmd
+}
+
+func (m rootModel) View() string {
+	switch m.state {
+	case LoginState:
+		return m.login.View()
+
+	case DashState:
+		return m.dash.View()
+
+	case FriendlistState:
+		return m.friendlist.View()
+
+	case SettingState:
+		return m.settings.View()
+
+	default:
+		return "Unknow state"
+	}
+}
+
+type LoginPageView struct {
 	loggedin        bool
 	Width           int
 	Hieght          int
@@ -689,6 +805,7 @@ type model struct {
 	recoveryOTP         bool
 	NewPass             string
 	forgetpasswordSteps int
+	loginAttampt        int
 	// client side warnings
 
 	warning string
@@ -706,11 +823,11 @@ type model struct {
 	glitchmode       bool
 }
 
-func (m model) Init() tea.Cmd {
+func (m LoginPageView) Init() tea.Cmd {
 	return tick()
 }
 
-func InishialMOD() model {
+func InishialMOD() LoginPageView {
 	var yes bool
 	var currentcolore int
 	if Currentcolor != "" || Animetedcolore != "" {
@@ -726,7 +843,7 @@ func InishialMOD() model {
 	ti.Focus()
 	ti.CharLimit = 150
 	ti.Width = 20
-	return model{
+	return LoginPageView{
 		textinput:       ti,
 		err:             nil,
 		Quiting:         false,
@@ -759,19 +876,8 @@ type forgetResultMsg struct {
 	success bool
 }
 
-var I = 0
-var ISlogedin bool
-
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m LoginPageView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-
-	if !m.loggedin && I < 3 {
-		I++
-		if tokenchekcing(baseURL) {
-			ISlogedin = true
-			return m , tea.Quit
-		}
-	}
 
 	if m.loggedin {
 		m.Homeselected = true
@@ -858,6 +964,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "enter":
+
 			if !m.Homeselected {
 				m.Homeselected = true
 			}
@@ -1164,7 +1271,7 @@ func makeGradientText(text string, colors []string, N int) string {
 	return out.String()
 }
 
-func (m model) View() string {
+func (m LoginPageView) View() string {
 
 	var themeColor string
 
@@ -1255,7 +1362,7 @@ func (m model) View() string {
 
 	var l string
 
-	if m.animetedlog  {
+	if m.animetedlog {
 
 		l = animetedmakeGradientText(`
 		
@@ -1279,7 +1386,7 @@ func (m model) View() string {
  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
                                     `, m.currentlogoColor, m.currentcolor)
 
-	} 
+	}
 	// 	logo := fmt.Sprintf(`
 
 	//  ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
@@ -1496,10 +1603,20 @@ func main() {
 	Currentcolor = os.Getenv("currentcolor")
 	Animetedcolore = os.Getenv("animetedcolor")
 
-	App := tea.NewProgram(InishialMOD(), tea.WithAltScreen())
+	// 1. Setup the initial state of your models
+	m := rootModel{
+		state:      LoginState,
+		login:      InishialMOD(), // Use a helper function to set up text inputs
+		friendlist: FriendlistView{},
+		dash:       NewDashboard(),
+		settings:   SettingsView{},
+	}
 
-	if _, err := App.Run(); err != nil {
-		fmt.Printf("%v", err)
+	p := tea.NewProgram(m, tea.WithAltScreen()) // Use Altscreen for a "clean" look
+
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Alas, a crash! Error: %v\n", err)
+		os.Exit(1)
 	}
 
 }
