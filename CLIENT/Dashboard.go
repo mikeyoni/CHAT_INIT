@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -17,19 +18,41 @@ type DashboardView struct {
 	// Universal items
 	warning string
 	active  bool
+
+	// friendlist
+	Friendlist             []string
+	Nfriendlist            int
+	IssillectedFriendtomsg bool
+
+	Requestlist []string
+	Online      bool
+	Offline     bool
+
+	startTime time.Time
 }
 
 func (m DashboardView) Init() tea.Cmd {
-	return tick()
+	return tea.Batch(tick(), fetchFriends())
+}
+
+type friendsLoadedMsg []string
+
+func fetchFriends() tea.Cmd {
+	return func() tea.Msg {
+		list := viewflist(baseURL)
+		return friendsLoadedMsg(list)
+	}
 }
 
 func NewDashboard() DashboardView {
 	dash := DashboardView{
+		startTime: time.Now(),
 		currentlogoColor: []string{
 			"Red", "Orange", "Yellow", "Green",
 			"Cyan", "Blue", "Purple", "Pink",
 		},
 	}
+	// this loade the friend list
 
 	// LOAD SAVED SETTINGS HERE (Only once!)
 	if Currentcolor != "" {
@@ -78,8 +101,20 @@ func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		}
 
+	case friendsLoadedMsg:
+		m.Friendlist = msg
+
+		return m, tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
+			return fetchFriends()()
+		})
+
 	case tickMsg:
-		m.colorstep = (m.colorstep + 5) % 1530
+		// Convert to float first, then multiply, then back to int
+		elapsed := time.Since(m.startTime).Milliseconds()
+
+		// We use a larger multiplier if it's too slow, or check the math
+		m.colorstep = int(float64(elapsed)*0.29) % 1530
+
 		return m, tick()
 
 	}
@@ -179,51 +214,53 @@ func (m DashboardView) View() string {
 		Foreground(lipgloss.Color("rgb(0, 0, 0)"))
 
 	titlebar := lipgloss.NewStyle().Background(lipgloss.Color(themeColor)).Align(lipgloss.Left).
-	Width(width-4).Bold(true).Foreground(lipgloss.Color("#00000000")).Render(fmt.Sprintf(" LOGEDIN AS : @%v",myuser))
-
+		Width(width - 4).Bold(true).Foreground(lipgloss.Color("#00000000")).Render(fmt.Sprintf(" LOGEDIN AS : @%v", myuser))
 
 	render += "\n"
 	render += titlebar
 	render += "\n"
-	
-	Dashe := lipgloss.NewStyle().Width(width-4).Padding(1,1).Align(lipgloss.Center)
-	Flistbox := lipgloss.NewStyle().Width(40).Align(lipgloss.Center).
-	Border(lipgloss.RoundedBorder()).Margin(0 , 4)
-	title := yellotext.Render("	FRIENDS	")
 
-	flist := Flistbox.Render(title , "\n\n\n\n\n\n\n\n\n")	
+	Dashe := lipgloss.NewStyle().Width(width-4).Padding(1, 1).Align(lipgloss.Center)
+	Fv := lipgloss.NewStyle().Margin(0).Align(lipgloss.Center).PaddingBottom(1)
+	Flistbox := lipgloss.NewStyle().Width(40).Align(lipgloss.Center).
+		Border(lipgloss.RoundedBorder()).Margin(0, 4)
+	title := yellotext.Render("	FRIENDS	")
+	title += "\n"
+	F := ""
+	F += "\n"
+	for I, _ := range m.Friendlist {
+
+		F += Fv.Render(m.Friendlist[I])
+		F += "\n"
+
+		if I > 2 {
+			break
+		}
+
+	}
+
+	flist := Flistbox.Render(title, F)
 	// in here we gonna also add the list of the friend print them in there
 
 	Settingbtn := lipgloss.NewStyle().Width(20).Align(lipgloss.Center).
-	Border(lipgloss.RoundedBorder()).Bold(true)
-	
+		Border(lipgloss.RoundedBorder()).Bold(true)
+
 	ManageFriend := lipgloss.NewStyle().Width(20).Align(lipgloss.Center).
-	Border(lipgloss.RoundedBorder()).Bold(true)
+		Border(lipgloss.RoundedBorder()).Bold(true)
 
 	statuse := lipgloss.NewStyle().Width(20).Align(lipgloss.Center).
-	Border(lipgloss.ThickBorder()).Bold(true).Foreground(lipgloss.Color(themeColor)).Blink(true).
-	BorderForeground(lipgloss.Color(themeColor)).Padding(0,0)
-	
+		Border(lipgloss.ThickBorder()).Bold(true).Foreground(lipgloss.Color(themeColor)).Blink(true).
+		BorderForeground(lipgloss.Color(themeColor)).Padding(0, 0)
 
 	status := statuse.Render(fmt.Sprintf("Total Friends : 10\nOnline : 4"))
 	settings := Settingbtn.Render(" SETTING ")
 	managefriend := ManageFriend.Render(" MANAGE FRIEND ")
 
-	button := lipgloss.JoinVertical(lipgloss.Left , settings , managefriend ,"", status )
-	
-	Dash := Dashe.Render( lipgloss.JoinHorizontal( lipgloss.Top , flist , button ))
+	button := lipgloss.JoinVertical(lipgloss.Left, settings, managefriend, "", status)
+
+	Dash := Dashe.Render(lipgloss.JoinHorizontal(lipgloss.Top, flist, button))
 
 	render += Dash
-
-
-
-
-
-
-
-
-
-
 
 	if m.warning != "" {
 		warningRender = warnStyle.Render(m.warning)
@@ -237,8 +274,6 @@ func (m DashboardView) View() string {
 		l, render,
 		warningRender,
 	)
-
-	
 
 	centerContent += "\n" + Footther.Render(Shortcut.Render("Quit = 'Q' < 'I' & 'G'"), Versions.Render("v.1.02"))
 	v = boxrender.Render(centerContent)
