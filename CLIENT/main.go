@@ -690,6 +690,7 @@ func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var newModel tea.Model
 
+	
 	// 1. GLOBAL WINDOW RESIZE (Safe)
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		WinSize.Width = msg.Width
@@ -1271,7 +1272,7 @@ func makeGradientText(text string, colors []string, N int) string {
 }
 
 func (m LoginPageView) View() string {
-
+	width := WinSize.Width
 	var themeColor string
 
 	if m.animetedlog {
@@ -1326,7 +1327,7 @@ func (m LoginPageView) View() string {
 		Width(50)
 
 	// Update the version text color too!
-	Versions := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Right).
+	Versions := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Right).
 		Foreground(lipgloss.Color(themeColor))
 
 	// var selectedboxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ff0037")).
@@ -1346,17 +1347,17 @@ func (m LoginPageView) View() string {
 
 	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color(themeColor)).
-		Width(m.Width-4).Padding(0, 0).Align(lipgloss.Center)
+		Width(width-4).Padding(0, 0).Align(lipgloss.Center)
 	v := "\n your welcome to chat init \n"
 
-	Shortcut := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Left).
+	Shortcut := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Left).
 		Foreground(lipgloss.Color("#ffffff9b"))
 
 	// Versions := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Right).
 	// 	Foreground(lipgloss.Color(themeColor))
 
 	subtitle := cynetext.Render("BY ui_mik3y | YT && INSTA <3 ")
-	Footther := lipgloss.NewStyle().Width(m.Width - 10).Bold(true).
+	Footther := lipgloss.NewStyle().Width(width - 10).Bold(true).
 		Foreground(lipgloss.Color("rgb(0, 0, 0)"))
 
 	var l string
