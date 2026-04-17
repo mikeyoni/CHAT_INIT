@@ -67,7 +67,7 @@ var (
 	REDarrowStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("rgb(205, 0, 0)")).
 			Bold(true).
-			Render("\n   ❯ ")
+			Render("❯")
 
 	headerStyle = lipgloss.NewStyle().
 			Bold(true).
@@ -686,11 +686,18 @@ var WinSize = struct {
 	Height int
 }{}
 
+type SwitchToSettingsMsg struct{}
+
+func SwitchToSettings() tea.Cmd {
+    return func() tea.Msg {
+        return SwitchToSettingsMsg{}
+    }
+}
+
 func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var newModel tea.Model
 
-	
 	// 1. GLOBAL WINDOW RESIZE (Safe)
 	if msg, ok := msg.(tea.WindowSizeMsg); ok {
 		WinSize.Width = msg.Width
@@ -710,18 +717,25 @@ func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// We use "ctrl+o", "ctrl+s", etc. so typing normally doesn't break the app
 	if msg, ok := msg.(tea.KeyMsg); ok {
 		switch msg.String() {
-		case "ctrl+w" , "ctrl+W":
+		case "ctrl+w", "ctrl+W":
 			m.state = FriendlistState
 			return m, m.friendlist.Init()
-		case "ctrl+s" , "ctrl+S":
+		case "ctrl+s", "ctrl+S":
 			m.state = SettingState
 			return m, m.settings.Init()
-		case "ctrl+d" , "ctrl+D":
+		case "ctrl+d", "ctrl+D":
 			m.state = DashState
 			return m, m.dash.Init()
 		}
 	}
 
+	switch msg.(type){
+		case SwitchToSettingsMsg:
+        m.state = SettingState
+        // Return the root model and the Init command for the settings page
+        return m, m.settings.Init()
+
+	}
 	// 4. ROUTING (The rest stays exactly the same)
 	switch m.state {
 	case LoginState:
