@@ -23,6 +23,11 @@ type DashboardView struct {
 	Friendlist             []string
 	Nfriendlist            int
 	IssillectedFriendtomsg bool
+	friendselecting        bool
+	friendscrolling        int
+
+	settinguseing        bool
+	settingandfriendmenu int
 
 	Requestlist []string
 	Online      bool
@@ -31,8 +36,18 @@ type DashboardView struct {
 	startTime time.Time
 }
 
+var isFriendLoopRunning = false
+
 func (m DashboardView) Init() tea.Cmd {
-	return tea.Batch(tick(), fetchFriends())
+	// Only start the rainbow tick
+	cmds := []tea.Cmd{tick()}
+
+	// Only add fetchFriends if it's NOT already running
+	if !isFriendLoopRunning {
+		isFriendLoopRunning = true
+		cmds = append(cmds, fetchFriends())
+	}
+	return tea.Batch(cmds...)
 }
 
 type friendsLoadedMsg []string
@@ -95,10 +110,39 @@ func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.animetedcolor = !m.animetedcolor
 			savesettings(m.currentcolor, m.animetedcolor)
+		case "left":
+			m.friendselecting = true
+			m.settinguseing = false
+
+		case "right":
+			m.friendselecting = false
+			m.settinguseing = true
+
+		case "down":
+			if m.friendselecting && m.friendscrolling < len(m.Friendlist)-1 && !m.settinguseing {
+				m.friendscrolling++
+			}
+			if m.settinguseing && !m.friendselecting && m.settingandfriendmenu < 1 {
+				m.settingandfriendmenu++
+			}
+
+		case "up":
+			if m.friendselecting && m.friendscrolling > 0 {
+				m.friendscrolling--
+			}
+			if m.settinguseing && m.settingandfriendmenu > 0 {
+				m.settingandfriendmenu--
+			}
 
 		case "y", "Y":
 			m.glitchmode = !m.glitchmode
-
+		
+		case "enter":
+			if m.settinguseing {
+				if m.settingandfriendmenu == 0 {
+					return m , SwitchToSettings()
+				}
+			}
 		}
 
 	case friendsLoadedMsg:
@@ -183,6 +227,17 @@ func (m DashboardView) View() string {
 
 	// Update the version text color too!
 
+
+var SelectedFriend = lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).
+	Width(25).Align(lipgloss.Center).
+	Border(lipgloss.ThickBorder()).Bold(true).
+	BorderTop(true).
+    BorderLeft(false).
+    BorderRight(false).
+    BorderBottom(true).
+	BorderForeground(lipgloss.Color(themeColor))
+
+
 	Versions := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Right).
 		Foreground(lipgloss.Color(themeColor))
 
@@ -221,17 +276,43 @@ func (m DashboardView) View() string {
 	render += "\n"
 
 	Dashe := lipgloss.NewStyle().Width(width-4).Padding(1, 1).Align(lipgloss.Center)
+
 	Fv := lipgloss.NewStyle().Margin(0).Align(lipgloss.Center).PaddingBottom(1)
 	Flistbox := lipgloss.NewStyle().Width(40).Align(lipgloss.Center).
 		Border(lipgloss.RoundedBorder()).Margin(0, 4)
-	title := yellotext.Render("	FRIENDS	")
+	SelectedFlistbox := lipgloss.NewStyle().Width(40).Align(lipgloss.Center).
+		Border(lipgloss.ThickBorder()).Margin(0, 4).
+		BorderForeground(lipgloss.Color(themeColor))
+
+	
+		
+
+	title := yellotext.Render(" 	FRIENDS TO MSG	  ")
 	title += "\n"
 	F := ""
 	F += "\n"
-	for I, _ := range m.Friendlist {
 
-		F += Fv.Render(m.Friendlist[I])
-		F += "\n"
+	for I := range m.Friendlist {
+
+		if !m.friendselecting {
+			F += Fv.Render(fmt.Sprintf("@%v",m.Friendlist[I]))
+			F += "\n"
+		} else if m.friendselecting {
+
+			if I == 0 {
+
+				F += SelectedFriend.Render(REDarrowStyle, greentext.Render(fmt.Sprintf( "@%v", m.Friendlist[m.friendscrolling])))
+
+			} else {
+				if I+m.friendscrolling > len(m.Friendlist)-1 {
+					F += Fv.Render(" ")
+				} else {
+
+					F += Fv.Render(fmt.Sprintf("@%s", m.Friendlist[I+m.friendscrolling]))
+				}
+			}
+			F += "\n"
+		}
 
 		if I > 2 {
 			break
@@ -239,22 +320,58 @@ func (m DashboardView) View() string {
 
 	}
 
-	flist := Flistbox.Render(title, F)
+	var flist string
+
+	if !m.friendselecting {
+
+		flist = Flistbox.Render(title, F)
+
+	} else {
+
+		flist = SelectedFlistbox.Render(title, F)
+
+	}
+
 	// in here we gonna also add the list of the friend print them in there
 
 	Settingbtn := lipgloss.NewStyle().Width(20).Align(lipgloss.Center).
 		Border(lipgloss.RoundedBorder()).Bold(true)
 
+	Selectedsettingbtn := lipgloss.NewStyle().Width(20).Align(lipgloss.Center).
+		Border(lipgloss.ThickBorder()).Bold(true).BorderForeground(lipgloss.Color(themeColor)).
+		Foreground(lipgloss.Color("#f2ff00"))
+
 	ManageFriend := lipgloss.NewStyle().Width(20).Align(lipgloss.Center).
 		Border(lipgloss.RoundedBorder()).Bold(true)
 
-	statuse := lipgloss.NewStyle().Width(20).Align(lipgloss.Center).
-		Border(lipgloss.ThickBorder()).Bold(true).Foreground(lipgloss.Color(themeColor)).Blink(true).
-		BorderForeground(lipgloss.Color(themeColor)).Padding(0, 0)
+	SelectedManageFriend := lipgloss.NewStyle().Width(20).Align(lipgloss.Center).
+		Border(lipgloss.ThickBorder()).Bold(true).BorderForeground(lipgloss.Color(themeColor)).
+		Foreground(lipgloss.Color("#f2ff00"))
 
-	status := statuse.Render(fmt.Sprintf("Total Friends : 10\nOnline : 4"))
-	settings := Settingbtn.Render(" SETTING ")
-	managefriend := ManageFriend.Render(" MANAGE FRIEND ")
+	statuse := lipgloss.NewStyle().Width(20).Align(lipgloss.Center).
+		Border(lipgloss.ThickBorder()).Bold(true).Foreground(lipgloss.Color(themeColor)).
+		Padding(0, 0).BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).
+		MarginLeft(1)
+
+	status := statuse.Render(fmt.Sprintf("Total Friends : %v\nOnline : 4 \n\n USE : <- -> ^ v ", len(m.Friendlist)))
+
+	settings := ""
+	managefriend := ""
+
+	if m.settinguseing && m.settingandfriendmenu == 0 {
+
+		settings = Selectedsettingbtn.Render(REDarrowStyle, Redtext.Render(" SETTING "))
+		managefriend = ManageFriend.Render(" MANAGE FRIEND ")
+
+	} else if m.settinguseing && m.settingandfriendmenu == 1 {
+
+		settings = Settingbtn.Render(" SETTING ")
+		managefriend = SelectedManageFriend.Render(REDarrowStyle, Redtext.Render(" MANAGE FRIEND "))
+
+	} else {
+		settings = Settingbtn.Render(" SETTING ")
+		managefriend = ManageFriend.Render(" MANAGE FRIEND ")
+	}
 
 	button := lipgloss.JoinVertical(lipgloss.Left, settings, managefriend, "", status)
 
