@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -10,12 +11,13 @@ import (
 )
 
 type DirectMsgView struct {
-	textInput     textinput.Model
-	currentcolor  int
-	animetedcolor bool
-	colorstep     int
+	FriendtoMsg      string
+	textInput        textinput.Model
+	currentcolor     int
+	animetedcolor    bool
+	colorstep        int
 	currentlogoColor []string
-	glitchmode    bool
+	glitchmode       bool
 	// Chat specific
 	messages []string
 	// Universal items
@@ -68,33 +70,8 @@ func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 
-		case "q", "Q":
-			// Only quit if not typing in the input
-			if !m.textInput.Focused() {
-				return m, tea.Quit
-			}
-
 		case "enter":
-			if m.textInput.Value() != "" {
-				m.messages = append(m.messages, "You: "+m.textInput.Value())
-				m.textInput.SetValue("")
-			}
 
-		case "i", "I", "tab":
-			// If text input isn't focused or we want to cycle anyway
-			if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor)-1 {
-				m.currentcolor++
-			} else {
-				m.currentcolor = 0
-			}
-			savesettings(m.currentcolor, m.animetedcolor)
-
-		case "g", "G":
-			m.animetedcolor = !m.animetedcolor
-			savesettings(m.currentcolor, m.animetedcolor)
-
-		case "y", "Y":
-			m.glitchmode = !m.glitchmode
 		}
 
 	case tickMsg:
@@ -109,72 +86,115 @@ func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m DirectMsgView) View() string {
 
 	width := WinSize.Width
+	// height := WinSize.Height
 
-	var render string
+	// var render string
 	var warningRender string
 	var themeColor string
 
 	if m.animetedcolor {
+		// This pulls the EXACT color from your rainbow math
 		r, g, b := getRainbowColor(m.colorstep * 2)
 		themeColor = fmt.Sprintf("#%02x%02x%02x", r, g, b)
+
 	} else {
-		themeColor = "#7D56F4"
+		// Standard static color logic
+		themeColor = "#7D56F4" // Default
 		if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
 			switch m.currentlogoColor[m.currentcolor] {
-			case "Red":    themeColor = "#FF0000"
-			case "Orange": themeColor = "#FF8800"
-			case "Yellow": themeColor = "#FFFF00"
-			case "Green":  themeColor = "#00FF00"
-			case "Cyan":   themeColor = "#00FFFF"
-			case "Blue":   themeColor = "#0000FF"
-			case "Purple": themeColor = "#9D00FF"
-			case "Pink":   themeColor = "#FF00FF"
+			case "Red":
+				themeColor = "#FF0000"
+			case "Orange":
+				themeColor = "#FF8800"
+			case "Yellow":
+				themeColor = "#FFFF00"
+			case "Green":
+				themeColor = "#00FF00"
+			case "Cyan":
+				themeColor = "#00FFFF"
+			case "Blue":
+				themeColor = "#0000FF"
+			case "Purple":
+				themeColor = "#9D00FF"
+			case "Pink":
+				themeColor = "#FF00FF"
 			}
 		}
 	}
 
-	Versions := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Right).
-		Foreground(lipgloss.Color(themeColor))
+	// var selectedboxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ff0037")).
+	// 		BorderForeground(lipgloss.Color("#ff0059")).
+	// 		Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
+	// // inishializing rainbow color
 
-	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).
-		BorderForeground(lipgloss.Color(themeColor)).
-		Width(width-4).Height(12).Padding(0, 1).Align(lipgloss.Left)
-
-	var l string
-	if m.animetedcolor {
-		l = animetedmakeGradientText("MESSAGES", m.colorstep*2, m.glitchmode)
-	} else {
-		l = makeGradientText("MESSAGES", m.currentlogoColor, m.currentcolor)
-	}
-
-	// Chat log rendering
-	var chatLog string
-	for _, msg := range m.messages {
-		chatLog += msg + "\n"
-	}
-
-	Footther := lipgloss.NewStyle().Width(width - 10).Bold(true).
-		Foreground(lipgloss.Color("rgb(0, 0, 0)"))
-
-	if m.warning != "" {
-		warningRender = warnStyle.Render(m.warning)
-	}
-
-	Shortcut := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Left).
-		Foreground(lipgloss.Color("#ffffff9b"))
-
-	inputArea := lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).Render("\n > ") + m.textInput.View()
-
-	centerContent := lipgloss.JoinVertical(
-		lipgloss.Center,
-		l,
-		boxrender.Render(chatLog),
-		inputArea,
-		render,
-		warningRender, "\n",
-	)
-
-	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit < 'I' & 'G' "), Versions.Render("v.1.02"))
+	var boxrender = lipgloss.NewStyle().
+    Border(lipgloss.ThickBorder()).
+    BorderForeground(lipgloss.Color(themeColor)).
+    Width(width-4).
+    Height(WinSize.Height-4).
+    Padding(0).
+    Align(lipgloss.Center).    // Keeps content centered horizontally (Left to Right)
+    AlignVertical(lipgloss.Top).
+	BorderTop(false)	
 	
-	return lipgloss.Place(width, 0, lipgloss.Center, lipgloss.Center, centerContent)
+	v := "\n your welcome to chat init \n"
+
+	// 	var l string
+	// 	l += "\n"
+	// 	if m.animetedcolor {
+	// 		l += animetedmakeGradientText(` ▄▀▀▀ █  █ █▀▀█ ▀█▀   ▀█▀ █▀▀▄ ▀█▀ ▀█▀
+	//  █    █▀▀█ █▄▄█  █     █  █  █  █   █
+	//  ▀▀▀ ▀  ▀ ▀  ▀  ▀    ▄█▄ ▀  ▀ ▄█▄  ▀`, m.colorstep*2, m.glitchmode)
+	// 	}
+
+	// 	if !m.animetedcolor {
+	// 		l += makeGradientText(` ▄▀▀▀ █  █ █▀▀█ ▀█▀   ▀█▀ █▀▀▄ ▀█▀ ▀█▀
+	//  █    █▀▀█ █▄▄█  █     █  █  █  █   █
+	//  ▀▀▀ ▀  ▀ ▀  ▀  ▀    ▄█▄ ▀  ▀ ▄█▄  ▀`, m.currentlogoColor, m.currentcolor)
+	// 	}
+
+	titlebar := lipgloss.NewStyle().Background(lipgloss.Color(themeColor)).Align(lipgloss.Left).
+		Width(width - 4).Bold(true).Padding(0,0).BorderBackground(lipgloss.Color(themeColor)).
+		Foreground(lipgloss.Color("#00000000"))
+	// usernameshotleft := lipgloss.NewStyle().Align(lipgloss.Left)
+	// tomsgshow := lipgloss.NewStyle().Align(lipgloss.Right)
+
+	// Usernameshow := usernameshotleft.Render(fmt.Sprintf("MSG TO -> @%v", m.FriendtoMsg))
+
+	leftSide := fmt.Sprintf("  MSG TO -> @%v  ", m.FriendtoMsg)
+	rightSide := fmt.Sprintf("LOGEDIN AS : @%v   ", myuser)
+
+	totalWidth := width - 4
+	occupiedWidth := lipgloss.Width(leftSide) + lipgloss.Width(rightSide)
+	spacerWidth := totalWidth - occupiedWidth
+
+	if spacerWidth < 0 {
+		spacerWidth = 0
+	}
+	spacer := strings.Repeat(" ", spacerWidth)
+
+	// 4. Join them and Render inside the colored bar
+	title := lipgloss.JoinHorizontal(lipgloss.Top, leftSide, spacer, rightSide)
+
+	// Replace the bottom part of your function with this:
+    
+    // Render the bar itself
+    headerBar := titlebar.Render(title)
+
+    if m.warning != "" {
+        warningRender = warnStyle.Render(m.warning)
+    }
+
+    // Join them without extra spaces
+    centerContent := lipgloss.JoinVertical(
+        lipgloss.Left, // Changed to Left to ensure it hugs the edge
+        headerBar,
+        warningRender,
+    )
+
+    // Ensure boxrender has absolutely no top padding
+    v = boxrender.PaddingTop(0).Render(centerContent)
+
+    return v
 }
+
