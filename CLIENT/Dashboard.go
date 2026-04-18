@@ -110,6 +110,7 @@ func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.animetedcolor = !m.animetedcolor
 			savesettings(m.currentcolor, m.animetedcolor)
+			
 		case "left":
 			m.friendselecting = true
 			m.settinguseing = false
@@ -141,6 +142,9 @@ func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.settinguseing {
 				if m.settingandfriendmenu == 0 {
 					return m , SwitchToSettings()
+				}
+				if m.settingandfriendmenu == 1 {
+					return  m , SwitchtoFriend()
 				}
 			}
 		}
@@ -287,7 +291,7 @@ var SelectedFriend = lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).
 	
 		
 
-	title := yellotext.Render(" 	FRIENDS TO MSG	  ")
+	title := yellotext.Render(" -- FRIENDS TO MSG -- ")
 	title += "\n"
 	F := ""
 	F += "\n"
