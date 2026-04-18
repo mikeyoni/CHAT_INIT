@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"strconv"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -17,8 +17,9 @@ type SettingsView struct {
 	// Settings specific
 	cursor int
 	// Universal items
-	warning string
-	active  bool
+	warning   string
+	active    bool
+	startTime time.Time
 }
 
 func (m SettingsView) Init() tea.Cmd {
@@ -33,17 +34,6 @@ func NewSettings() SettingsView {
 		},
 	}
 
-	// LOAD SAVED SETTINGS HERE (Only once!)
-	if Currentcolor != "" {
-		if number, err := strconv.Atoi(Currentcolor); err == nil {
-			s.currentcolor = number
-		}
-	}
-
-	if Animetedcolore == "true" {
-		s.animetedcolor = true
-	}
-
 	return s
 }
 
@@ -53,6 +43,10 @@ func (m SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+
+		case "esc":
+			m.active = false
+			return m, SwitchtoDash()
 
 		case "ctrl+c":
 			return m, tea.Quit
@@ -91,7 +85,13 @@ func (m SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tickMsg:
-		m.colorstep = (m.colorstep + 5) % 1530
+
+		// Convert to float first, then multiply, then back to int
+		elapsed := time.Since(m.startTime).Milliseconds()
+
+		// We use a larger multiplier if it's too slow, or check the math
+		m.colorstep = int(float64(elapsed)*0.29) % 1530
+
 		return m, tick()
 
 	}
