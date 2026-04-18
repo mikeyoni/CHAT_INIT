@@ -99,7 +99,7 @@ var (
 	Orange = color.RGBA{255, 136, 0, 255}
 )
 
-var yellotext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffd900")).Bold(true).Underline(true)
+var yellotext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffd900")).Bold(true)
 var Redtext = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Bold(true)
 var warnStyle = lipgloss.NewStyle().Width(50).Align(lipgloss.Center)
 var greentext = lipgloss.NewStyle().Foreground(lipgloss.Color("#3cff00")).Bold(true)
@@ -687,11 +687,25 @@ var WinSize = struct {
 }{}
 
 type SwitchToSettingsMsg struct{}
+type SwitchToFriendMsg struct{}
+type SwitchToDashMsg struct{}
 
 func SwitchToSettings() tea.Cmd {
-    return func() tea.Msg {
-        return SwitchToSettingsMsg{}
-    }
+	return func() tea.Msg {
+		return SwitchToSettingsMsg{}
+	}
+}
+
+func SwitchtoDash() tea.Cmd{
+	return func() tea.Msg {
+		return SwitchToDashMsg{}
+	}
+}
+
+func SwitchtoFriend() tea.Cmd{
+	return func() tea.Msg {
+		return SwitchToFriendMsg{}
+	}
 }
 
 func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -708,32 +722,42 @@ func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !m.islogedin && m.loginAttampt < 3 {
 		if tokenchekcing(baseURL) {
 			m.islogedin = true
-			m.state = DashState
-			return m, m.dash.Init()
+			m.state = DirectMsgState
+			return m, m.directmsg.Init()
 		}
 	}
 
 	// 3. SAFE STATE SWITCHING
 	// We use "ctrl+o", "ctrl+s", etc. so typing normally doesn't break the app
 	if msg, ok := msg.(tea.KeyMsg); ok {
-		switch msg.String() {
-		case "ctrl+w", "ctrl+W":
-			m.state = FriendlistState
-			return m, m.friendlist.Init()
-		case "ctrl+s", "ctrl+S":
-			m.state = SettingState
-			return m, m.settings.Init()
-		case "ctrl+d", "ctrl+D":
-			m.state = DashState
-			return m, m.dash.Init()
+		if m.islogedin {
+
+			switch msg.String() {
+			case "ctrl+w", "ctrl+W":
+				m.state = FriendlistState
+				return m, m.friendlist.Init()
+			case "ctrl+s", "ctrl+S":
+				m.state = SettingState
+				return m, m.settings.Init()
+			case "ctrl+d", "ctrl+D":
+				m.state = DashState
+				return m, m.dash.Init()
+			}
 		}
 	}
 
-	switch msg.(type){
-		case SwitchToSettingsMsg:
-        m.state = SettingState
-        // Return the root model and the Init command for the settings page
-        return m, m.settings.Init()
+	switch msg.(type) {
+	case SwitchToSettingsMsg:
+		m.state = SettingState
+		return m, m.settings.Init()
+
+	case SwitchToDashMsg:
+		m.state = DashState
+		return  m , m.dash.Init()
+
+	case SwitchToFriendMsg:
+		m.state = FriendlistState
+		return m , m.friendlist.Init()
 
 	}
 	// 4. ROUTING (The rest stays exactly the same)
@@ -779,7 +803,10 @@ func (m rootModel) View() string {
 
 	case SettingState:
 		return m.settings.View()
-
+	
+	case DirectMsgState:
+		return m.directmsg.View()
+		
 	default:
 		return "Unknow state"
 	}
