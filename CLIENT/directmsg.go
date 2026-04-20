@@ -179,7 +179,7 @@ func (m DirectMsgView) View() string {
 
 	// Replace the bottom part of your function with this:
     
-    // Render the bar itself
+    
     headerBar := titlebar.Render(title)
 
     if m.warning != "" {
