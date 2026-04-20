@@ -173,6 +173,8 @@ func (m DirectMsgView) View() string {
 	}
 	spacer := strings.Repeat(" ", spacerWidth)
 
+	// likei have to commit bcz i didn't for 2 days
+	
 	// 4. Join them and Render inside the colored bar
 	title := lipgloss.JoinHorizontal(lipgloss.Top, leftSide, spacer, rightSide)
 
