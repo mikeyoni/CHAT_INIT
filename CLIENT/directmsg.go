@@ -177,7 +177,6 @@ func (m DirectMsgView) View() string {
 	// 4. Join them and Render inside the colored bar
 	title := lipgloss.JoinHorizontal(lipgloss.Top, leftSide, spacer, rightSide)
 
-	// Replace the bottom part of your function with this:
     
     
     headerBar := titlebar.Render(title)
