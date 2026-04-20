@@ -61,6 +61,7 @@ func NewDirectMsg() DirectMsgView {
 
 func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	
 	m.active = true
 
 	switch msg := msg.(type) {
@@ -128,15 +129,16 @@ func (m DirectMsgView) View() string {
 	// // inishializing rainbow color
 
 	var boxrender = lipgloss.NewStyle().
-    Border(lipgloss.ThickBorder()).
-    BorderForeground(lipgloss.Color(themeColor)).
-    Width(width-4).
-    Height(WinSize.Height-4).
-    Padding(0).
-    Align(lipgloss.Center).    // Keeps content centered horizontally (Left to Right)
-    AlignVertical(lipgloss.Top).
-	BorderTop(false)	
-	
+		Border(lipgloss.ThickBorder()).
+		BorderForeground(lipgloss.Color(themeColor)).
+		Width(width - 4).
+		Height(WinSize.Height - 4).
+		Padding(0).
+		Align(lipgloss.Center). // Keeps content centered horizontally (Left to Right)
+		AlignVertical(lipgloss.Top).
+		BorderTop(false).BorderBottom(false)
+		
+
 	v := "\n your welcome to chat init \n"
 
 	// 	var l string
@@ -154,7 +156,7 @@ func (m DirectMsgView) View() string {
 	// 	}
 
 	titlebar := lipgloss.NewStyle().Background(lipgloss.Color(themeColor)).Align(lipgloss.Left).
-		Width(width - 4).Bold(true).Padding(0,0).BorderBackground(lipgloss.Color(themeColor)).
+		Width(width-4).Bold(true).Padding(0, 0).BorderBackground(lipgloss.Color(themeColor)).
 		Foreground(lipgloss.Color("#00000000"))
 	// usernameshotleft := lipgloss.NewStyle().Align(lipgloss.Left)
 	// tomsgshow := lipgloss.NewStyle().Align(lipgloss.Right)
@@ -171,30 +173,40 @@ func (m DirectMsgView) View() string {
 	if spacerWidth < 0 {
 		spacerWidth = 0
 	}
-	spacer := strings.Repeat(" ", spacerWidth)
 
+	spacer := strings.Repeat(" ", spacerWidth)
 
 	// 4. Join them and Render inside the colored bar
 	title := lipgloss.JoinHorizontal(lipgloss.Top, leftSide, spacer, rightSide)
+	chastboxrender := lipgloss.NewStyle().BorderForeground(lipgloss.Color(themeColor)).Border(lipgloss.RoundedBorder()).
+	Width(width-6).Foreground(lipgloss.Color(themeColor))
 
-    
-    
-    headerBar := titlebar.Render(title)
+	Chatbox := chastboxrender.Render( " " , REDarrowStyle , m.textInput.View() )
 
-    if m.warning != "" {
-        warningRender = warnStyle.Render(m.warning)
-    }
+	headerBar := titlebar.Render(title)
 
-    // Join them without extra spaces
-    centerContent := lipgloss.JoinVertical(
-        lipgloss.Left, // Changed to Left to ensure it hugs the edge
-        headerBar,
-        warningRender,
-    )
+	spacerHeight := WinSize.Height - 4 - 1 - 2
+	if spacerHeight < 0 {
+		spacerHeight = 0
+	}
 
-    // Ensure boxrender has absolutely no top padding
-    v = boxrender.PaddingTop(0).Render(centerContent)
+	spacere := strings.Repeat("\n", spacerHeight)
 
-    return v
+	if m.warning != "" {
+		warningRender = warnStyle.Render(m.warning)
+	}
+
+	// Join them without extra spaces
+	centerContent := lipgloss.JoinVertical(
+		lipgloss.Left, // Changed to Left to ensure it hugs the edge
+		headerBar,
+		spacere,
+		warningRender,
+	)
+
+	render := lipgloss.JoinVertical(lipgloss.Left, centerContent, Chatbox)
+	// Ensure boxrender has absolutely no top padding
+	v = boxrender.PaddingTop(0).Render(render)
+
+	return v
 }
-
