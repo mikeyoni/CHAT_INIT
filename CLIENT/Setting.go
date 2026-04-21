@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -9,11 +8,10 @@ import (
 )
 
 type SettingsView struct {
-	currentcolor     int
-	animetedcolor    bool
-	colorstep        int
-	currentlogoColor []string
-	glitchmode       bool
+	currentcolor  int
+	animetedcolor bool
+	colorstep     int
+	glitchmode    bool
 	// Settings specific
 	cursor int
 	// Universal items
@@ -28,17 +26,16 @@ func (m SettingsView) Init() tea.Cmd {
 
 func NewSettings() SettingsView {
 	s := SettingsView{
-		currentlogoColor: []string{
-			"Red", "Orange", "Yellow", "Green",
-			"Cyan", "Blue", "Purple", "Pink",
-		},
+		startTime: time.Now(),
 	}
 
+	applySharedTheme(&s.currentcolor, &s.animetedcolor)
 	return s
 }
 
 func (m SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.active = true
+	applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -69,16 +66,12 @@ func (m SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "i", "I", "tab":
-			if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor)-1 {
-				m.currentcolor++
-			} else {
-				m.currentcolor = 0
-			}
-			savesettings(m.currentcolor, m.animetedcolor)
+			cycleThemeColor()
+			applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
 		case "g", "G":
-			m.animetedcolor = !m.animetedcolor
-			savesettings(m.currentcolor, m.animetedcolor)
+			toggleAnimatedColor()
+			applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
 		case "y", "Y":
 			m.glitchmode = !m.glitchmode
@@ -104,34 +97,8 @@ func (m SettingsView) View() string {
 
 	var render string
 	var warningRender string
-	var themeColor string
-
-	if m.animetedcolor {
-		r, g, b := getRainbowColor(m.colorstep * 2)
-		themeColor = fmt.Sprintf("#%02x%02x%02x", r, g, b)
-	} else {
-		themeColor = "#7D56F4"
-		if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
-			switch m.currentlogoColor[m.currentcolor] {
-			case "Red":
-				themeColor = "#FF0000"
-			case "Orange":
-				themeColor = "#FF8800"
-			case "Yellow":
-				themeColor = "#FFFF00"
-			case "Green":
-				themeColor = "#00FF00"
-			case "Cyan":
-				themeColor = "#00FFFF"
-			case "Blue":
-				themeColor = "#0000FF"
-			case "Purple":
-				themeColor = "#9D00FF"
-			case "Pink":
-				themeColor = "#FF00FF"
-			}
-		}
-	}
+	applySharedTheme(&m.currentcolor, &m.animetedcolor)
+	themeColor := currentThemeColorHex(m.colorstep)
 
 	Versions := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Right).
 		Foreground(lipgloss.Color(themeColor))
@@ -154,11 +121,7 @@ func (m SettingsView) View() string {
 	}
 
 	var l string
-	if m.animetedcolor {
-		l = animetedmakeGradientText("SETTINGS", m.colorstep*2, m.glitchmode)
-	} else {
-		l = makeGradientText("SETTINGS", m.currentlogoColor, m.currentcolor)
-	}
+	l = currentThemeGradientText("SETTINGS", m.colorstep, m.glitchmode)
 
 	Footther := lipgloss.NewStyle().Width(width - 10).Bold(true).
 		Foreground(lipgloss.Color("rgb(0, 0, 0)"))
