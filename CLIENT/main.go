@@ -696,13 +696,13 @@ func SwitchToSettings() tea.Cmd {
 	}
 }
 
-func SwitchtoDash() tea.Cmd{
+func SwitchtoDash() tea.Cmd {
 	return func() tea.Msg {
 		return SwitchToDashMsg{}
 	}
 }
 
-func SwitchtoFriend() tea.Cmd{
+func SwitchtoFriend() tea.Cmd {
 	return func() tea.Msg {
 		return SwitchToFriendMsg{}
 	}
@@ -753,11 +753,11 @@ func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case SwitchToDashMsg:
 		m.state = DashState
-		return  m , m.dash.Init()
+		return m, m.dash.Init()
 
 	case SwitchToFriendMsg:
 		m.state = FriendlistState
-		return m , m.friendlist.Init()
+		return m, m.friendlist.Init()
 
 	}
 	// 4. ROUTING (The rest stays exactly the same)
@@ -803,10 +803,10 @@ func (m rootModel) View() string {
 
 	case SettingState:
 		return m.settings.View()
-	
+
 	case DirectMsgState:
 		return m.directmsg.View()
-		
+
 	default:
 		return "Unknow state"
 	}
@@ -1119,7 +1119,7 @@ func (m LoginPageView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.forgetpasswordSteps = 1
 
 					if sentforgetpassreq(m.recoveryEail) {
-						m.warning = fmt.Sprintf("SuccessFully Otp Send To : ", m.recoveryEail)
+						m.warning = fmt.Sprintf("SuccessFully Otp Send To : %s", m.recoveryEail)
 					}
 
 				} else if m.forgetpasswordSteps == 1 {
@@ -1651,6 +1651,7 @@ func main() {
 		friendlist: FriendlistView{},
 		dash:       NewDashboard(),
 		settings:   SettingsView{},
+		directmsg:  NewDirectMsg(),
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen()) // Use Altscreen for a "clean" look
