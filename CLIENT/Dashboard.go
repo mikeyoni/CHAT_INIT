@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -10,11 +9,10 @@ import (
 )
 
 type DashboardView struct {
-	currentcolor     int
-	animetedcolor    bool
-	colorstep        int
-	currentlogoColor []string
-	glitchmode       bool
+	currentcolor  int
+	animetedcolor bool
+	colorstep     int
+	glitchmode    bool
 	// Universal items
 	warning string
 	active  bool
@@ -62,29 +60,14 @@ func fetchFriends() tea.Cmd {
 func NewDashboard() DashboardView {
 	dash := DashboardView{
 		startTime: time.Now(),
-		currentlogoColor: []string{
-			"Red", "Orange", "Yellow", "Green",
-			"Cyan", "Blue", "Purple", "Pink",
-		},
 	}
-	// this loade the friend list
-
-	// LOAD SAVED SETTINGS HERE (Only once!)
-	if Currentcolor != "" {
-		if number, err := strconv.Atoi(Currentcolor); err == nil {
-			dash.currentcolor = number
-		}
-	}
-
-	if Animetedcolore == "true" {
-		dash.animetedcolor = true
-	}
-
+	applySharedTheme(&dash.currentcolor, &dash.animetedcolor)
 	return dash
 }
 
 func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.active = true
+	applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -97,20 +80,13 @@ func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "i", "I", "tab":
-
-			if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor)-1 {
-				m.currentcolor++
-			} else {
-				m.currentcolor = 0
-			}
-
-			savesettings(m.currentcolor, m.animetedcolor)
+			cycleThemeColor()
+			applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
 		case "g", "G":
+			toggleAnimatedColor()
+			applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
-			m.animetedcolor = !m.animetedcolor
-			savesettings(m.currentcolor, m.animetedcolor)
-			
 		case "left":
 			m.friendselecting = true
 			m.settinguseing = false
@@ -137,14 +113,14 @@ func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "y", "Y":
 			m.glitchmode = !m.glitchmode
-		
+
 		case "enter":
 			if m.settinguseing {
 				if m.settingandfriendmenu == 0 {
-					return m , SwitchToSettings()
+					return m, SwitchToSettings()
 				}
 				if m.settingandfriendmenu == 1 {
-					return  m , SwitchtoFriend()
+					return m, SwitchtoFriend()
 				}
 			}
 		}
@@ -176,37 +152,8 @@ func (m DashboardView) View() string {
 
 	var render string
 	var warningRender string
-	var themeColor string
-
-	if m.animetedcolor {
-		// This pulls the EXACT color from your rainbow math
-		r, g, b := getRainbowColor(m.colorstep * 2)
-		themeColor = fmt.Sprintf("#%02x%02x%02x", r, g, b)
-
-	} else {
-		// Standard static color logic
-		themeColor = "#7D56F4" // Default
-		if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
-			switch m.currentlogoColor[m.currentcolor] {
-			case "Red":
-				themeColor = "#FF0000"
-			case "Orange":
-				themeColor = "#FF8800"
-			case "Yellow":
-				themeColor = "#FFFF00"
-			case "Green":
-				themeColor = "#00FF00"
-			case "Cyan":
-				themeColor = "#00FFFF"
-			case "Blue":
-				themeColor = "#0000FF"
-			case "Purple":
-				themeColor = "#9D00FF"
-			case "Pink":
-				themeColor = "#FF00FF"
-			}
-		}
-	}
+	applySharedTheme(&m.currentcolor, &m.animetedcolor)
+	themeColor := currentThemeColorHex(m.colorstep)
 
 	// if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
 	//     switch m.currentlogoColor[m.currentcolor] {
@@ -231,16 +178,14 @@ func (m DashboardView) View() string {
 
 	// Update the version text color too!
 
-
-var SelectedFriend = lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).
-	Width(25).Align(lipgloss.Center).
-	Border(lipgloss.ThickBorder()).Bold(true).
-	BorderTop(true).
-    BorderLeft(false).
-    BorderRight(false).
-    BorderBottom(true).
-	BorderForeground(lipgloss.Color(themeColor))
-
+	var SelectedFriend = lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).
+		Width(25).Align(lipgloss.Center).
+		Border(lipgloss.ThickBorder()).Bold(true).
+		BorderTop(true).
+		BorderLeft(false).
+		BorderRight(false).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color(themeColor))
 
 	Versions := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Right).
 		Foreground(lipgloss.Color(themeColor))
@@ -259,14 +204,14 @@ var SelectedFriend = lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).
 	l += "\n"
 	if m.animetedcolor {
 		l += animetedmakeGradientText(` ▄▀▀▀ █  █ █▀▀█ ▀█▀   ▀█▀ █▀▀▄ ▀█▀ ▀█▀
- █    █▀▀█ █▄▄█  █     █  █  █  █   █ 
+ █    █▀▀█ █▄▄█  █     █  █  █  █   █
  ▀▀▀ ▀  ▀ ▀  ▀  ▀    ▄█▄ ▀  ▀ ▄█▄  ▀`, m.colorstep*2, m.glitchmode)
 	}
 
 	if !m.animetedcolor {
 		l += makeGradientText(` ▄▀▀▀ █  █ █▀▀█ ▀█▀   ▀█▀ █▀▀▄ ▀█▀ ▀█▀
- █    █▀▀█ █▄▄█  █     █  █  █  █   █ 
- ▀▀▀ ▀  ▀ ▀  ▀  ▀    ▄█▄ ▀  ▀ ▄█▄  ▀`, m.currentlogoColor, m.currentcolor)
+ █    █▀▀█ █▄▄█  █     █  █  █  █   █
+ ▀▀▀ ▀  ▀ ▀  ▀  ▀    ▄█▄ ▀  ▀ ▄█▄  ▀`, themeColorNames, m.currentcolor)
 	}
 
 	Footther := lipgloss.NewStyle().Width(width - 10).Bold(true).
@@ -288,9 +233,6 @@ var SelectedFriend = lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).
 		Border(lipgloss.ThickBorder()).Margin(0, 4).
 		BorderForeground(lipgloss.Color(themeColor))
 
-	
-		
-
 	title := yellotext.Render(" -- FRIENDS TO MSG -- ")
 	title += "\n"
 	F := ""
@@ -299,13 +241,13 @@ var SelectedFriend = lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).
 	for I := range m.Friendlist {
 
 		if !m.friendselecting {
-			F += Fv.Render(fmt.Sprintf("@%v",m.Friendlist[I]))
+			F += Fv.Render(fmt.Sprintf("@%v", m.Friendlist[I]))
 			F += "\n"
 		} else if m.friendselecting {
 
 			if I == 0 {
 
-				F += SelectedFriend.Render(REDarrowStyle, greentext.Render(fmt.Sprintf( "@%v", m.Friendlist[m.friendscrolling])))
+				F += SelectedFriend.Render(REDarrowStyle, greentext.Render(fmt.Sprintf("@%v", m.Friendlist[m.friendscrolling])))
 
 			} else {
 				if I+m.friendscrolling > len(m.Friendlist)-1 {
