@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -11,13 +10,12 @@ import (
 )
 
 type DirectMsgView struct {
-	FriendtoMsg      string
-	textInput        textinput.Model
-	currentcolor     int
-	animetedcolor    bool
-	colorstep        int
-	currentlogoColor []string
-	glitchmode       bool
+	FriendtoMsg   string
+	textInput     textinput.Model
+	currentcolor  int
+	animetedcolor bool
+	colorstep     int
+	glitchmode    bool
 	// Chat specific
 	messages []string
 	// Universal items
@@ -40,52 +38,45 @@ func NewDirectMsg() DirectMsgView {
 	dm := DirectMsgView{
 		textInput: ti,
 		messages:  []string{"System: Connection established."},
-		currentlogoColor: []string{
-			"Red", "Orange", "Yellow", "Green",
-			"Cyan", "Blue", "Purple", "Pink",
-		},
 	}
-
-	// LOAD SAVED SETTINGS HERE (Only once!)
-	if Currentcolor != "" {
-		if number, err := strconv.Atoi(Currentcolor); err == nil {
-			dm.currentcolor = number
-		}
-	}
-
-	if Animetedcolore == "true" {
-		dm.animetedcolor = true
-	}
-
+	applySharedTheme(&dm.currentcolor, &dm.animetedcolor)
 	return dm
 }
 
 func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-    var cmd tea.Cmd
-    m.active = true
+	var cmd tea.Cmd
+	m.active = true
+	applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
-    // 1. Capture the input's command immediately
-    m.textInput, cmd = m.textInput.Update(msg)
+	m.textInput, cmd = m.textInput.Update(msg)
 
-    switch msg := msg.(type) {
-    case tea.KeyMsg:
-        switch msg.String() {
-        case "ctrl+c":
-            return m, tea.Quit
-        case "enter":
-            // Your enter logic
-        }
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.active = false
+			return m, SwitchtoDash()
+		case "i", "I", "tab":
+			cycleThemeColor()
+			applySharedTheme(&m.currentcolor, &m.animetedcolor)
+		case "g", "G":
+			toggleAnimatedColor()
+			applySharedTheme(&m.currentcolor, &m.animetedcolor)
+		case "y", "Y":
+			m.glitchmode = !m.glitchmode
+		case "enter":
+			// Your enter logic
+		}
 
-    case tickMsg:
-        m.colorstep = (m.colorstep + 5) % 1530
-        // 2. BATCH the tick with the input's command so both live
-        return m, tea.Batch(tick(), cmd)
-    }
+	case tickMsg:
+		m.colorstep = (m.colorstep + 5) % 1530
+		return m, tea.Batch(tick(), cmd)
+	}
 
-    // 3. Return the command so the cursor knows to blink
-    return m, cmd
+	return m, cmd
 }
-
 
 func (m DirectMsgView) View() string {
 
@@ -94,37 +85,8 @@ func (m DirectMsgView) View() string {
 
 	// var render string
 	var warningRender string
-	var themeColor string
-
-	if m.animetedcolor {
-		// This pulls the EXACT color from your rainbow math
-		r, g, b := getRainbowColor(m.colorstep * 2)
-		themeColor = fmt.Sprintf("#%02x%02x%02x", r, g, b)
-
-	} else {
-		// Standard static color logic
-		themeColor = "#7D56F4" // Default
-		if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
-			switch m.currentlogoColor[m.currentcolor] {
-			case "Red":
-				themeColor = "#FF0000"
-			case "Orange":
-				themeColor = "#FF8800"
-			case "Yellow":
-				themeColor = "#FFFF00"
-			case "Green":
-				themeColor = "#00FF00"
-			case "Cyan":
-				themeColor = "#00FFFF"
-			case "Blue":
-				themeColor = "#0000FF"
-			case "Purple":
-				themeColor = "#9D00FF"
-			case "Pink":
-				themeColor = "#FF00FF"
-			}
-		}
-	}
+	applySharedTheme(&m.currentcolor, &m.animetedcolor)
+	themeColor := currentThemeColorHex(m.colorstep)
 
 	// var selectedboxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ff0037")).
 	// 		BorderForeground(lipgloss.Color("#ff0059")).
@@ -212,6 +174,12 @@ func (m DirectMsgView) View() string {
 		warningRender,
 		Chatbox,
 	)
+
+	footer := lipgloss.NewStyle().
+		Width(width - 6).
+		Foreground(lipgloss.Color("#ffffff9b")).
+		Render("'ESC' = Back  'I' = Next Color  'G' = Toggle Animation")
+	centerContent = lipgloss.JoinVertical(lipgloss.Left, centerContent, footer)
 
 	// Remove .Height() from boxrender temporarily to see if it fixes it
 	// If it works without .Height(), your calculation was clipping the input
