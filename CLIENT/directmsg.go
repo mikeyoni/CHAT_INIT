@@ -32,6 +32,7 @@ func (m DirectMsgView) Init() tea.Cmd {
 func NewDirectMsg() DirectMsgView {
 	ti := textinput.New()
 	ti.Placeholder = "Type a message..."
+	ti.Prompt = ""
 	ti.Focus()
 	ti.CharLimit = 156
 	ti.Width = 30
@@ -60,29 +61,31 @@ func NewDirectMsg() DirectMsgView {
 }
 
 func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	var cmd tea.Cmd
-	
-	m.active = true
+    var cmd tea.Cmd
+    m.active = true
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+    // 1. Capture the input's command immediately
+    m.textInput, cmd = m.textInput.Update(msg)
 
-		case "ctrl+c":
-			return m, tea.Quit
+    switch msg := msg.(type) {
+    case tea.KeyMsg:
+        switch msg.String() {
+        case "ctrl+c":
+            return m, tea.Quit
+        case "enter":
+            // Your enter logic
+        }
 
-		case "enter":
+    case tickMsg:
+        m.colorstep = (m.colorstep + 5) % 1530
+        // 2. BATCH the tick with the input's command so both live
+        return m, tea.Batch(tick(), cmd)
+    }
 
-		}
-
-	case tickMsg:
-		m.colorstep = (m.colorstep + 5) % 1530
-		return m, tick()
-	}
-
-	m.textInput, cmd = m.textInput.Update(msg)
-	return m, cmd
+    // 3. Return the command so the cursor knows to blink
+    return m, cmd
 }
+
 
 func (m DirectMsgView) View() string {
 
@@ -137,9 +140,8 @@ func (m DirectMsgView) View() string {
 		Align(lipgloss.Center). // Keeps content centered horizontally (Left to Right)
 		AlignVertical(lipgloss.Top).
 		BorderTop(false).BorderBottom(false)
-		
 
-	v := "\n your welcome to chat init \n"
+	// v := "\n your welcome to chat init \n"
 
 	// 	var l string
 	// 	l += "\n"
@@ -179,34 +181,40 @@ func (m DirectMsgView) View() string {
 	// 4. Join them and Render inside the colored bar
 	title := lipgloss.JoinHorizontal(lipgloss.Top, leftSide, spacer, rightSide)
 	chastboxrender := lipgloss.NewStyle().BorderForeground(lipgloss.Color(themeColor)).Border(lipgloss.RoundedBorder()).
-	Width(width-6).Foreground(lipgloss.Color(themeColor))
+		Width(width - 6).Foreground(lipgloss.Color(themeColor))
 
-	Chatbox := chastboxrender.Render( " " , REDarrowStyle , m.textInput.View() )
+	Chatbox := chastboxrender.Render(" ", REDarrowStyle, m.textInput.View())
 
 	headerBar := titlebar.Render(title)
 
-	spacerHeight := WinSize.Height - 4 - 1 - 2
+	if m.warning != "" {
+		warningRender = warnStyle.Render(m.warning)
+	}
+
+	// Get actual heights
+	// hH := lipgloss.Height(headerBar)
+	// cH := lipgloss.Height(Chatbox)
+
+	// Subtract an extra 2 lines just to be safe from terminal rounding errors
+	spacerHeight := WinSize.Height - 6 - lipgloss.Height(headerBar) - lipgloss.Height(Chatbox)
+
 	if spacerHeight < 0 {
 		spacerHeight = 0
 	}
 
 	spacere := strings.Repeat("\n", spacerHeight)
 
-	if m.warning != "" {
-		warningRender = warnStyle.Render(m.warning)
-	}
-
-	// Join them without extra spaces
+	// Ensure the order is correct
 	centerContent := lipgloss.JoinVertical(
-		lipgloss.Left, // Changed to Left to ensure it hugs the edge
+		lipgloss.Left,
 		headerBar,
-		spacere,
+		spacere, // Pushes everything below it to the bottom
 		warningRender,
+		Chatbox,
 	)
 
-	render := lipgloss.JoinVertical(lipgloss.Left, centerContent, Chatbox)
-	// Ensure boxrender has absolutely no top padding
-	v = boxrender.PaddingTop(0).Render(render)
+	// Remove .Height() from boxrender temporarily to see if it fixes it
+	// If it works without .Height(), your calculation was clipping the input
+	return boxrender.Height(WinSize.Height - 4).Render(centerContent)
 
-	return v
 }
