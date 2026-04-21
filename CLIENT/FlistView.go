@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -9,11 +8,10 @@ import (
 )
 
 type FriendlistView struct {
-	currentcolor     int
-	animetedcolor    bool
-	colorstep        int
-	currentlogoColor []string
-	glitchmode       bool
+	currentcolor  int
+	animetedcolor bool
+	colorstep     int
+	glitchmode    bool
 	// List specific
 	friends []string
 	cursor  int
@@ -38,11 +36,7 @@ func (m FriendlistView) Init() tea.Cmd {
 
 func NewFriendlist() FriendlistView {
 	fl := FriendlistView{
-		startTime: time.Now(), // <--- THIS IS THE FIX
-		currentlogoColor: []string{
-			"Red", "Orange", "Yellow", "Green",
-			"Cyan", "Blue", "Purple", "Pink",
-		},
+		startTime: time.Now(),
 		friends: []string{
 			"Mikey [Online]",
 			"Pirate_King [Away]",
@@ -51,12 +45,13 @@ func NewFriendlist() FriendlistView {
 			"Gopher_01 [Offline]",
 		},
 	}
-	// ... the rest of your loading logic
+	applySharedTheme(&fl.currentcolor, &fl.animetedcolor)
 	return fl
 }
 
 func (m FriendlistView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.active = true
+	applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -87,16 +82,12 @@ func (m FriendlistView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "i", "I", "tab":
-			if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor)-1 {
-				m.currentcolor++
-			} else {
-				m.currentcolor = 0
-			}
-			savesettings(m.currentcolor, m.animetedcolor)
+			cycleThemeColor()
+			applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
 		case "g", "G":
-			m.animetedcolor = !m.animetedcolor
-			savesettings(m.currentcolor, m.animetedcolor)
+			toggleAnimatedColor()
+			applySharedTheme(&m.currentcolor, &m.animetedcolor)
 
 		case "y", "Y":
 			m.glitchmode = !m.glitchmode
@@ -122,34 +113,8 @@ func (m FriendlistView) View() string {
 
 	var render string
 	var warningRender string
-	var themeColor string
-
-	if m.animetedcolor {
-		r, g, b := getRainbowColor(m.colorstep * 2)
-		themeColor = fmt.Sprintf("#%02x%02x%02x", r, g, b)
-	} else {
-		themeColor = "#7D56F4"
-		if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
-			switch m.currentlogoColor[m.currentcolor] {
-			case "Red":
-				themeColor = "#FF0000"
-			case "Orange":
-				themeColor = "#FF8800"
-			case "Yellow":
-				themeColor = "#FFFF00"
-			case "Green":
-				themeColor = "#00FF00"
-			case "Cyan":
-				themeColor = "#00FFFF"
-			case "Blue":
-				themeColor = "#0000FF"
-			case "Purple":
-				themeColor = "#9D00FF"
-			case "Pink":
-				themeColor = "#FF00FF"
-			}
-		}
-	}
+	applySharedTheme(&m.currentcolor, &m.animetedcolor)
+	themeColor := currentThemeColorHex(m.colorstep)
 
 	Versions := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Right).
 		Foreground(lipgloss.Color(themeColor))
@@ -159,11 +124,7 @@ func (m FriendlistView) View() string {
 		Width(width-4).Padding(0, 0).Align(lipgloss.Center)
 
 	var l string
-	if m.animetedcolor {
-		l = animetedmakeGradientText("FRIENDS", m.colorstep*2, m.glitchmode)
-	} else {
-		l = makeGradientText("FRIENDS", m.currentlogoColor, m.currentcolor)
-	}
+	l = currentThemeGradientText("FRIENDS", m.colorstep, m.glitchmode)
 
 	// Friend list rendering
 	var listContent string
