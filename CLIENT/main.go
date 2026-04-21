@@ -346,18 +346,6 @@ func savecradenshial(username string, tokeen string) {
 
 }
 
-func savesettings(color int, animetedcolor bool) {
-	yes := "false"
-	if animetedcolor {
-		yes = "true"
-	}
-	settings := fmt.Sprintf("\ncurrentcolor=%v\nanimetedcolor=%v", color, yes)
-	err := os.WriteFile(".setings", []byte(settings), 0644)
-	if err != nil {
-		fmt.Printf(" \n \n \n \n faild to save setting's: %v \n", err)
-	}
-}
-
 func chate(tusr string, token string, user string) {
 
 	url := fmt.Sprintf("ws://localhost:4040/chat?user=%s&token=%s", user, token)
@@ -869,16 +857,6 @@ func (m LoginPageView) Init() tea.Cmd {
 }
 
 func InishialMOD() LoginPageView {
-	var yes bool
-	var currentcolore int
-	if Currentcolor != "" || Animetedcolore != "" {
-		number, _ := strconv.Atoi(Currentcolor)
-		if Animetedcolore == "true" {
-			yes = true
-		}
-		currentcolore = number
-	}
-
 	ti := textinput.New()
 	ti.Placeholder = "Enter Your Username "
 	ti.Focus()
@@ -903,8 +881,8 @@ func InishialMOD() LoginPageView {
 			"Purple",
 			"Pink",
 		},
-		currentcolor: currentcolore,
-		animetedlog:  yes,
+		currentcolor: normalizeThemeColorIndex(uiSettings.CurrentColor),
+		animetedlog:  uiSettings.AnimatedColor,
 	}
 }
 
@@ -919,6 +897,8 @@ type forgetResultMsg struct {
 
 func (m LoginPageView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	m.currentcolor = normalizeThemeColorIndex(uiSettings.CurrentColor)
+	m.animetedlog = uiSettings.AnimatedColor
 
 	if m.loggedin {
 		m.Homeselected = true
@@ -985,12 +965,9 @@ func (m LoginPageView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "i", "I", "tab":
 			if !isTyping {
-				if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor)-1 {
-					m.currentcolor++
-				} else {
-					m.currentcolor = 0
-				}
-				savesettings(m.currentcolor, m.animetedlog)
+				cycleThemeColor()
+				m.currentcolor = normalizeThemeColorIndex(uiSettings.CurrentColor)
+				m.animetedlog = uiSettings.AnimatedColor
 			}
 
 		case "Y", "y":
@@ -1000,8 +977,9 @@ func (m LoginPageView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "g", "G":
 			if !isTyping {
-				m.animetedlog = !m.animetedlog
-				savesettings(m.currentcolor, m.animetedlog)
+				toggleAnimatedColor()
+				m.currentcolor = normalizeThemeColorIndex(uiSettings.CurrentColor)
+				m.animetedlog = uiSettings.AnimatedColor
 			}
 
 		case "enter":
@@ -1314,37 +1292,9 @@ func makeGradientText(text string, colors []string, N int) string {
 
 func (m LoginPageView) View() string {
 	width := WinSize.Width
-	var themeColor string
-
-	if m.animetedlog {
-		// This pulls the EXACT color from your rainbow math
-		r, g, b := getRainbowColor(m.colorstep * 2)
-		themeColor = fmt.Sprintf("#%02x%02x%02x", r, g, b)
-
-	} else {
-		// Standard static color logic
-		themeColor = "#7D56F4" // Default
-		if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
-			switch m.currentlogoColor[m.currentcolor] {
-			case "Red":
-				themeColor = "#FF0000"
-			case "Orange":
-				themeColor = "#FF8800"
-			case "Yellow":
-				themeColor = "#FFFF00"
-			case "Green":
-				themeColor = "#00FF00"
-			case "Cyan":
-				themeColor = "#00FFFF"
-			case "Blue":
-				themeColor = "#0000FF"
-			case "Purple":
-				themeColor = "#9D00FF"
-			case "Pink":
-				themeColor = "#FF00FF"
-			}
-		}
-	}
+	m.currentcolor = normalizeThemeColorIndex(uiSettings.CurrentColor)
+	m.animetedlog = uiSettings.AnimatedColor
+	themeColor := currentThemeColorHex(m.colorstep)
 
 	// if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
 	//     switch m.currentlogoColor[m.currentcolor] {
@@ -1425,7 +1375,7 @@ func (m LoginPageView) View() string {
 ██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║   
 ╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║   
  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
-                                    `, m.currentlogoColor, m.currentcolor)
+                                    `, themeColorNames, m.currentcolor)
 
 	}
 	// 	logo := fmt.Sprintf(`
@@ -1640,17 +1590,15 @@ func main() {
 	mytoken = os.Getenv("token")
 	myuser = os.Getenv("user")
 
-	godotenv.Load(".setings")
-	Currentcolor = os.Getenv("currentcolor")
-	Animetedcolore = os.Getenv("animetedcolor")
+	loadUISettings()
 
 	// 1. Setup the initial state of your models
 	m := rootModel{
 		state:      LoginState,
 		login:      InishialMOD(), // Use a helper function to set up text inputs
-		friendlist: FriendlistView{},
+		friendlist: NewFriendlist(),
 		dash:       NewDashboard(),
-		settings:   SettingsView{},
+		settings:   NewSettings(),
 		directmsg:  NewDirectMsg(),
 	}
 
