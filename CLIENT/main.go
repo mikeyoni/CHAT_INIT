@@ -702,6 +702,7 @@ var WinSize = struct {
 type SwitchToSettingsMsg struct{}
 type SwitchToFriendMsg struct{}
 type SwitchToDashMsg struct{}
+type SwitchToLoginMsg struct{}
 type SwitchToDirectMsgMsg struct {
 	Friend string
 }
@@ -715,6 +716,12 @@ func SwitchToSettings() tea.Cmd {
 func SwitchtoDash() tea.Cmd {
 	return func() tea.Msg {
 		return SwitchToDashMsg{}
+	}
+}
+
+func SwitchtoLogin() tea.Cmd {
+	return func() tea.Msg {
+		return SwitchToLoginMsg{}
 	}
 }
 
@@ -777,12 +784,17 @@ func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg.(type) {
 	case SwitchToSettingsMsg:
+		m.settings.returnToLogin = m.state == LoginState
 		m.state = SettingState
 		return m, m.settings.Init()
 
 	case SwitchToDashMsg:
 		m.state = DashState
 		return m, m.dash.Init()
+
+	case SwitchToLoginMsg:
+		m.state = LoginState
+		return m, m.login.Init()
 
 	case SwitchToFriendMsg:
 		m.state = FriendlistState
@@ -921,7 +933,7 @@ func InishialMOD() LoginPageView {
 		back:            false,
 		Isselected:      false,
 		Homeselected:    false,
-		Homepageoptions: []string{"Login", "Register", "Forget Password", "Exit"},
+		Homepageoptions: []string{"Login", "Register", "Forget Password", "Settings", "Exit"},
 		currentlogoColor: []string{
 			"Red",
 			"Orange",
@@ -1014,23 +1026,9 @@ func (m LoginPageView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case "i", "I", "tab":
-			if !isTyping {
-				cycleThemeColor()
-				m.currentcolor = normalizeThemeColorIndex(uiSettings.CurrentColor)
-				m.animetedlog = uiSettings.AnimatedColor
-			}
-
 		case "Y", "y":
 			if !isTyping {
 				m.glitchmode = !m.glitchmode
-			}
-
-		case "g", "G":
-			if !isTyping {
-				toggleAnimatedColor()
-				m.currentcolor = normalizeThemeColorIndex(uiSettings.CurrentColor)
-				m.animetedlog = uiSettings.AnimatedColor
 			}
 
 		case "enter":
@@ -1222,6 +1220,8 @@ func (m LoginPageView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.forgetpasswordpage = true
 			m.textinput.Placeholder = "Enter Your Email"
 		case 3:
+			return m, SwitchToSettings()
+		case 4:
 			return m, tea.Quit
 		}
 	}
@@ -1342,292 +1342,151 @@ func makeGradientText(text string, colors []string, N int) string {
 }
 
 func (m LoginPageView) View() string {
-	width := WinSize.Width
+	_, _, contentWidth, contentHeight := frameDimensions()
 	m.currentcolor = normalizeThemeColorIndex(uiSettings.CurrentColor)
 	m.animetedlog = uiSettings.AnimatedColor
 	themeColor := currentThemeColorHex(m.colorstep)
-
-	// if m.currentcolor >= 0 && m.currentcolor < len(m.currentlogoColor) {
-	//     switch m.currentlogoColor[m.currentcolor] {
-	//     case "Red":    themeColor = "#FF0000"
-	//     case "Orange": themeColor = "#FF8800"
-	//     case "Yellow": themeColor = "#FFFF00"
-	//     case "Green":  themeColor = "#00FF00"
-	//     case "Cyan":   themeColor = "#00FFFF"
-	//     case "Blue":   themeColor = "#0000FF"
-	//     case "Purple": themeColor = "#9D00FF"
-	//     case "Pink":   themeColor = "#FF00FF"
-	//     }
-	// }
-
-	// 2. Create the dynamic selection box style
-	var selectedboxe = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color(themeColor)).
-		BorderForeground(lipgloss.Color(themeColor)).
-		Border(lipgloss.RoundedBorder()).
-		Width(50)
-
-	// Update the version text color too!
-	Versions := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Right).
-		Foreground(lipgloss.Color(themeColor))
-
-	// var selectedboxe = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#ff0037")).
-	// 		BorderForeground(lipgloss.Color("#ff0059")).
-	// 		Border(lipgloss.RoundedBorder()).Width(30).Align(lipgloss.Center)
-	// // inishializing rainbow color
-
-	if !m.Homeselected {
-		selectedboxe = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color(themeColor)).       // Text matches theme
-			BorderForeground(lipgloss.Color(themeColor)). // Border matches theme
-			Border(lipgloss.RoundedBorder()).
-			Width(30).
-			Align(lipgloss.Center)
+	fieldWidth := clamp(contentWidth-6, 26, 50)
+	panelHeight := clamp(contentHeight-12, 10, 18)
+	warningRender := ""
+	if m.warning != "" {
+		warningRender = warnStyle.Render(m.warning)
 	}
 
-	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).
-		BorderForeground(lipgloss.Color(themeColor)).
-		Width(width-4).Padding(0, 0).Align(lipgloss.Center)
-	v := "\n your welcome to chat init \n"
+	var panelTitle string
+	var panelBody string
 
-	Shortcut := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Left).
-		Foreground(lipgloss.Color("#ffffff9b"))
-
-	// Versions := lipgloss.NewStyle().Width((m.Width - 11) / 2).Align(lipgloss.Right).
-	// 	Foreground(lipgloss.Color(themeColor))
-
-	subtitle := cynetext.Render("BY ui_mik3y | YT && INSTA <3 ")
-	Footther := lipgloss.NewStyle().Width(width - 10).Bold(true).
-		Foreground(lipgloss.Color("rgb(0, 0, 0)"))
-
-	var l string
-
-	if m.animetedlog {
-
-		l = animetedmakeGradientText(`
-		
- ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
-██╔════╝██║  ██║██╔══██╗╚══██╔══╝    ██║████╗  ██║██║╚══██╔══╝
-██║     ███████║███████║   ██║       ██║██╔██╗ ██║██║   ██║   
-██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║   
-╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║   
- ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
-                                    `, m.colorstep*2, m.glitchmode)
-
-	} else {
-
-		l = makeGradientText(`
-		
- ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
-██╔════╝██║  ██║██╔══██╗╚══██╔══╝    ██║████╗  ██║██║╚══██╔══╝
-██║     ███████║███████║   ██║       ██║██╔██╗ ██║██║   ██║   
-██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║   
-╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║   
- ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   
-                                    `, themeColorNames, m.currentcolor)
-
-	}
-	// 	logo := fmt.Sprintf(`
-
-	//  ██████╗██╗  ██╗ █████╗ ████████╗    ██╗███╗   ██╗██╗████████╗
-	// ██╔════╝██║  ██║██╔══██╗╚══██╔══╝    ██║████╗  ██║██║╚══██╔══╝
-	// ██║     ███████║███████║   ██║       ██║██╔██╗ ██║██║   ██║
-	// ██║     ██╔══██║██╔══██║   ██║       ██║██║╚██╗██║██║   ██║
-	// ╚██████╗██║  ██║██║  ██║   ██║       ██║██║ ╚████║██║   ██║
-	//  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝       ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝
-	//                                  %v   `, subtitle)
-
-	var render string
-
-	if !m.Homeselected {
-		render += "\n"
+	switch {
+	case !m.Homeselected:
+		panelTitle = "Welcome"
+		rows := []string{}
 		for i := range m.Homepageoptions {
-
-			if m.choise == i {
-
-				render += "\n" + selectedboxe.Render(m.Homepageoptions[i])
-
-			} else {
-
-				render += "\n" + boxe.Render(m.Homepageoptions[i])
-
-			}
+			rows = append(rows, menuButton(m.Homepageoptions[i], m.choise == i, clamp(fieldWidth, 20, 30), themeColor))
 		}
+		panelBody = lipgloss.NewStyle().
+			Width(contentWidth - 6).
+			Align(lipgloss.Center).
+			Render(strings.Join(rows, "\n\n") + "\n\n" + statusText("choose an option and press enter"))
 
-	}
-
-	var warningRender = ""
-
-	if m.loginpage {
-
-		render += "\n"
-
-		smallbox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Width(50)
+	case m.loginpage:
+		panelTitle = "Login"
+		usernameValue := m.username
+		passwordValue := ""
 		if m.iscarentinput == 0 {
-			render += selectedboxe.Render(wboldtext.Render(" USERNAME ", m.textinput.View()))
-
-			render += "\n"
-
-			render += smallbox.Render(wboldtext.Render(" PASSWORD : "))
-
-		} else if m.iscarentinput == 1 {
-			render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
-
-			render += "\n"
-
-			render += selectedboxe.Render(wboldtext.Render(" PASSWORD ", m.textinput.View()))
-
-		} else if m.iscarentinput > 1 {
-
-			render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
-
-			render += "\n"
-
-			render += smallbox.Render(wboldtext.Render(" PASSWORD : ", strings.Repeat("*", len(m.password))))
-
-			render += "\n"
+			usernameValue = m.textinput.View()
+		}
+		if m.iscarentinput == 1 {
+			passwordValue = m.textinput.View()
+		} else if m.password != "" {
+			passwordValue = strings.Repeat("*", len(m.password))
 		}
 
-		if m.warning != "" {
-			warningRender = lipgloss.NewStyle().
-				Width(50).
-				Align(lipgloss.Center).
-				MarginTop(1). // Adds space without breaking layout
-				Render(Redtext.Render(m.warning))
+		panelBody = lipgloss.NewStyle().
+			Width(contentWidth - 6).
+			Align(lipgloss.Center).
+			Render(strings.Join([]string{
+				formField("Username", usernameValue, m.iscarentinput == 0, fieldWidth, themeColor),
+				"",
+				formField("Password", passwordValue, m.iscarentinput == 1, fieldWidth, themeColor),
+				"",
+				statusText("press enter to continue"),
+			}, "\n"))
+
+	case m.registerpage && m.needotp:
+		panelTitle = "Register"
+		panelBody = lipgloss.NewStyle().
+			Width(contentWidth - 6).
+			Align(lipgloss.Center).
+			Render(strings.Join([]string{
+				statusText("otp sent to " + m.email),
+				"",
+				formField("OTP", m.textinput.View(), true, fieldWidth, themeColor),
+				"",
+				statusText("press enter to verify"),
+			}, "\n"))
+
+	case m.registerpage:
+		panelTitle = "Register"
+		emailValue := m.email
+		passwordValue := ""
+		usernameValue := m.username
+
+		if m.Riscarentinput == 0 {
+			usernameValue = m.textinput.View()
+		}
+		if m.Riscarentinput == 1 {
+			emailValue = m.textinput.View()
+		}
+		if m.Riscarentinput == 2 {
+			passwordValue = m.textinput.View()
+		} else if m.password != "" {
+			passwordValue = strings.Repeat("*", len(m.password))
 		}
 
+		panelBody = lipgloss.NewStyle().
+			Width(contentWidth - 6).
+			Align(lipgloss.Center).
+			Render(strings.Join([]string{
+				formField("Username", usernameValue, m.Riscarentinput == 0, fieldWidth, themeColor),
+				"",
+				formField("Email", emailValue, m.Riscarentinput == 1, fieldWidth, themeColor),
+				"",
+				formField("Password", passwordValue, m.Riscarentinput == 2, fieldWidth, themeColor),
+				"",
+				statusText("press enter to continue"),
+			}, "\n"))
+
+	case m.forgetpasswordpage:
+		panelTitle = "Recover Password"
+		label := "Email"
+		value := m.textinput.View()
+		helper := "enter your recovery email"
+		if m.forgetpasswordSteps == 1 {
+			label = "OTP"
+			helper = "enter the otp sent to " + m.recoveryEail
+		}
+		if m.forgetpasswordSteps == 2 {
+			label = "New Password"
+			helper = "set a new password"
+		}
+
+		panelBody = lipgloss.NewStyle().
+			Width(contentWidth - 6).
+			Align(lipgloss.Center).
+			Render(strings.Join([]string{
+				statusText(helper),
+				"",
+				formField(label, value, true, fieldWidth, themeColor),
+				"",
+				statusText("press enter to continue"),
+			}, "\n"))
+
+	default:
+		panelTitle = "Welcome"
+		panelBody = statusText("choose an option and press enter")
 	}
 
-	if m.registerpage {
-		render += "\n"
-
-		smallbox := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Width(50)
-
-		if m.needotp {
-
-			render += wboldtext.Render("Enter The OTP We Sented On : ", m.email)
-			render += "\n"
-			render += selectedboxe.Render(wboldtext.Render(" OTP ", m.textinput.View()))
-
-		}
-
-		if !m.needotp {
-
-			if m.Riscarentinput == 0 {
-				render += selectedboxe.Render(wboldtext.Render(" USERNAME ", m.textinput.View()))
-
-				render += "\n"
-
-				render += smallbox.Render(wboldtext.Render(" EMAIL : "))
-
-				render += "\n"
-
-				render += smallbox.Render(wboldtext.Render(" PASSWORD : "))
-
-			} else if m.Riscarentinput == 1 {
-				render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
-				render += "\n"
-
-				render += selectedboxe.Render(wboldtext.Render(" EMAIL ", m.textinput.View()))
-				render += "\n"
-
-				render += smallbox.Render(wboldtext.Render(" PASSWORD "))
-
-			} else if m.Riscarentinput == 2 {
-				render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
-				render += "\n"
-
-				render += smallbox.Render(wboldtext.Render(" EMAIL : ", m.email))
-				render += "\n"
-
-				render += selectedboxe.Render(wboldtext.Render(" PASSWORD ", m.textinput.View()))
-
-			} else if m.Riscarentinput > 2 {
-
-				render += smallbox.Render(wboldtext.Render(" USERNAME : ", m.username))
-				render += "\n"
-
-				render += smallbox.Render(wboldtext.Render(" EMAIL : ", m.email))
-				render += "\n"
-
-				render += smallbox.Render(wboldtext.Render(" PASSWORD : ", strings.Repeat("*", len(m.password))))
-				render += "\n"
-
-			}
-
-			if m.warning != "" {
-
-				warningRender = lipgloss.NewStyle().
-					Width(50).
-					Align(lipgloss.Center).
-					MarginTop(1). // Adds space without breaking layout
-					Render(Redtext.Render(m.warning))
-			}
-		}
-	}
-
-	if m.forgetpasswordpage {
-		// render += "\n"
-		// render += "\n"
-		// render += wboldtext.Render(" THIS OPTION IS UNDER WORK :D ")
-		render += "\n"
-
-		switch m.forgetpasswordSteps {
-		case 0:
-			render += "\n"
-			render += wboldtext.Render(" Enter Your Recovery Email ")
-			render += "\n"
-			render += selectedboxe.Render(" Email ", m.textinput.View())
-			render += "\n"
-
-		case 1:
-			render += "\n"
-			render += wboldtext.Render(" Enter Your OTP on : ", m.recoveryEail)
-			render += "\n"
-			render += selectedboxe.Render(" OTP ", m.textinput.View())
-			render += "\n"
-
-		case 2:
-			render += "\n"
-			render += wboldtext.Render(" Enter Your New Paword ")
-			render += "\n"
-			render += selectedboxe.Render(" PASSWORD ", m.textinput.View())
-			render += "\n"
-		}
-
-		if m.warning != "" {
-
-			warningRender = lipgloss.NewStyle().
-				Width(50).
-				Align(lipgloss.Center).
-				MarginTop(1). // Adds space without breaking layout
-				Render(Redtext.Render(m.warning))
-		}
-
-	}
-
-	// if m.warning != "" {
-
-	// 	warningRender = lipgloss.NewStyle().
-	// 		Width(50).
-	// 		Align(lipgloss.Center).
-	// 		MarginTop(1). // Adds space without breaking layout
-	// 		Render(Redtext.Render(m.warning))
-	// }
-
-	centerContent := lipgloss.JoinVertical(
+	body := lipgloss.JoinVertical(
 		lipgloss.Center,
-		l+subtitle, render,
-		warningRender, "\n",
+		loginHero(themeColor, m.colorstep, m.glitchmode),
+		"",
+		compactHeader("terminal chat", "responsive layout", contentWidth),
+		"",
+		panelTitleWithBody(panelTitle, panelBody, contentWidth, panelHeight, themeColor),
 	)
 
-	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit < 'I' & 'G' "), Versions.Render("v.1.02"))
+	if warningRender != "" {
+		body = lipgloss.JoinVertical(lipgloss.Center, body, "", warningRender)
+	}
 
-	v = boxrender.Render(centerContent)
+	body = lipgloss.JoinVertical(
+		lipgloss.Center,
+		body,
+		"",
+		footerLine(contentWidth, "enter select   esc back   q quit", "v1.02"),
+	)
 
-	return v
+	return renderScreen(themeColor, body)
 
 }
 
