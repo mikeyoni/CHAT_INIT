@@ -28,8 +28,7 @@ type DashboardView struct {
 	settingandfriendmenu int
 
 	Requestlist []string
-	Online      bool
-	Offline     bool
+	OnlineFriends []string
 
 	startTime time.Time
 }
@@ -48,12 +47,17 @@ func (m DashboardView) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-type friendsLoadedMsg []string
+type friendsLoadedMsg struct {
+	friends []string
+	online  []string
+}
 
 func fetchFriends() tea.Cmd {
 	return func() tea.Msg {
-		list := viewflist(baseURL)
-		return friendsLoadedMsg(list)
+		return friendsLoadedMsg{
+			friends: viewflist(baseURL),
+			online:  viewOnlineFriends(baseURL),
+		}
 	}
 }
 
@@ -63,6 +67,24 @@ func NewDashboard() DashboardView {
 	}
 	applySharedTheme(&dash.currentcolor, &dash.animetedcolor)
 	return dash
+}
+
+func containsFriend(list []string, target string) bool {
+	for _, item := range list {
+		if item == target {
+			return true
+		}
+	}
+
+	return false
+}
+
+func renderFriendStatus(friend string, onlineFriends []string) string {
+	if containsFriend(onlineFriends, friend) {
+		return fmt.Sprintf("@%s [online]", friend)
+	}
+
+	return fmt.Sprintf("@%s [offline]", friend)
 }
 
 func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -115,6 +137,16 @@ func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.glitchmode = !m.glitchmode
 
 		case "enter":
+			if m.friendselecting && len(m.Friendlist) > 0 {
+				selectedFriend := m.Friendlist[m.friendscrolling]
+				if containsFriend(m.OnlineFriends, selectedFriend) {
+					m.warning = ""
+					return m, SwitchtoDirectMsg(selectedFriend)
+				}
+
+				m.warning = fmt.Sprintf("@%s is offline right now.", selectedFriend)
+			}
+
 			if m.settinguseing {
 				if m.settingandfriendmenu == 0 {
 					return m, SwitchToSettings()
@@ -126,7 +158,14 @@ func (m DashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case friendsLoadedMsg:
-		m.Friendlist = msg
+		m.Friendlist = msg.friends
+		m.OnlineFriends = msg.online
+		if m.friendscrolling >= len(m.Friendlist) && len(m.Friendlist) > 0 {
+			m.friendscrolling = len(m.Friendlist) - 1
+		}
+		if len(m.Friendlist) == 0 {
+			m.friendscrolling = 0
+		}
 
 		return m, tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
 			return fetchFriends()()
@@ -241,20 +280,20 @@ func (m DashboardView) View() string {
 	for I := range m.Friendlist {
 
 		if !m.friendselecting {
-			F += Fv.Render(fmt.Sprintf("@%v", m.Friendlist[I]))
+			F += Fv.Render(renderFriendStatus(m.Friendlist[I], m.OnlineFriends))
 			F += "\n"
 		} else if m.friendselecting {
 
 			if I == 0 {
 
-				F += SelectedFriend.Render(REDarrowStyle, greentext.Render(fmt.Sprintf("@%v", m.Friendlist[m.friendscrolling])))
+				F += SelectedFriend.Render(REDarrowStyle, greentext.Render(renderFriendStatus(m.Friendlist[m.friendscrolling], m.OnlineFriends)))
 
 			} else {
 				if I+m.friendscrolling > len(m.Friendlist)-1 {
 					F += Fv.Render(" ")
 				} else {
 
-					F += Fv.Render(fmt.Sprintf("@%s", m.Friendlist[I+m.friendscrolling]))
+					F += Fv.Render(renderFriendStatus(m.Friendlist[I+m.friendscrolling], m.OnlineFriends))
 				}
 			}
 			F += "\n"
@@ -299,7 +338,7 @@ func (m DashboardView) View() string {
 		Padding(0, 0).BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).
 		MarginLeft(1)
 
-	status := statuse.Render(fmt.Sprintf("Total Friends : %v\nOnline : 4 \n\n USE : <- -> ^ v ", len(m.Friendlist)))
+	status := statuse.Render(fmt.Sprintf("Total Friends : %v\nOnline : %v \n\n USE : <- -> ^ v ", len(m.Friendlist), len(m.OnlineFriends)))
 
 	settings := ""
 	managefriend := ""
