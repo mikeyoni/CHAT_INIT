@@ -78,7 +78,6 @@ func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// ok now htis is the 
 func (m DirectMsgView) View() string {
 
 	width := WinSize.Width
