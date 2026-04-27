@@ -27,7 +27,7 @@ type DashboardView struct {
 	settinguseing        bool
 	settingandfriendmenu int
 
-	Requestlist []string
+	Requestlist   []string
 	OnlineFriends []string
 
 	startTime time.Time
