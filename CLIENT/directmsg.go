@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/gorilla/websocket"
 )
 
 type DirectMsgView struct {
@@ -16,18 +17,50 @@ type DirectMsgView struct {
 	animetedcolor bool
 	colorstep     int
 	glitchmode    bool
+	conn          *websocket.Conn
+	readerStarted bool
 	// Chat specific
-	messages []string
+	my_msg       []string
+	Incoming_msg []string
+	messages     []string
 	// Universal items
 	warning string
 	active  bool
 }
 
-func (m DirectMsgView) Init() tea.Cmd {
-	return tea.Batch(textinput.Blink, tick())
+type directMsgConnectedMsg struct {
+	conn *websocket.Conn
 }
 
-func NewDirectMsg() DirectMsgView {
+type directMsgReceivedMsg struct {
+	text string
+}
+
+type directMsgErrorMsg struct {
+	text string
+}
+
+type directMsgConnectionClosedMsg struct {
+	text string
+}
+
+var directMessageEvents = make(chan tea.Msg, 32)
+
+func (m DirectMsgView) Init() tea.Cmd {
+	cmds := []tea.Cmd{textinput.Blink, tick()}
+
+	if m.conn == nil && m.FriendtoMsg != "" {
+		cmds = append(cmds, connectDirectSocket())
+	}
+
+	if m.readerStarted {
+		cmds = append(cmds, waitForDirectEvent())
+	}
+
+	return tea.Batch(cmds...)
+}
+
+func NewDirectMsg(friend string) DirectMsgView {
 	ti := textinput.New()
 	ti.Placeholder = "Type a message..."
 	ti.Prompt = ""
@@ -36,11 +69,66 @@ func NewDirectMsg() DirectMsgView {
 	ti.Width = WinSize.Width - 9
 
 	dm := DirectMsgView{
-		textInput: ti,
-		messages:  []string{"System: Connection established."},
+		FriendtoMsg: friend,
+		textInput:   ti,
+		messages: []string{
+			"System: Connection established.",
+		},
+		my_msg:       []string{},
+		Incoming_msg: []string{},
 	}
 	applySharedTheme(&dm.currentcolor, &dm.animetedcolor)
 	return dm
+}
+
+func connectDirectSocket() tea.Cmd {
+	return func() tea.Msg {
+		if myuser == "" || mytoken == "" {
+			return directMsgErrorMsg{text: "Missing user token."}
+		}
+
+		url := fmt.Sprintf("ws://localhost:4040/chat?user=%s&token=%s", myuser, mytoken)
+		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+		if err != nil {
+			return directMsgErrorMsg{text: fmt.Sprintf("Failed to connect chat socket: %v", err)}
+		}
+
+		return directMsgConnectedMsg{conn: conn}
+	}
+}
+
+func startDirectReader(conn *websocket.Conn) {
+	go func() {
+		for {
+			_, payload, err := conn.ReadMessage()
+			if err != nil {
+				directMessageEvents <- directMsgConnectionClosedMsg{text: fmt.Sprintf("Chat socket closed: %v", err)}
+				return
+			}
+
+			directMessageEvents <- directMsgReceivedMsg{text: string(payload)}
+		}
+	}()
+}
+
+func waitForDirectEvent() tea.Cmd {
+	return func() tea.Msg {
+		return <-directMessageEvents
+	}
+}
+
+func senderFromWireMessage(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "[") {
+		return ""
+	}
+
+	endIdx := strings.Index(trimmed, "]")
+	if endIdx == -1 {
+		return ""
+	}
+
+	return strings.TrimSpace(trimmed[1:endIdx])
 }
 
 func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -51,6 +139,36 @@ func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.textInput, cmd = m.textInput.Update(msg)
 
 	switch msg := msg.(type) {
+	case directMsgConnectedMsg:
+		m.conn = msg.conn
+		m.warning = ""
+		if !m.readerStarted {
+			startDirectReader(m.conn)
+			m.readerStarted = true
+		}
+		return m, waitForDirectEvent()
+
+	case directMsgReceivedMsg:
+		sender := senderFromWireMessage(msg.text)
+		if sender == "" || sender == m.FriendtoMsg {
+			m.Incoming_msg = append(m.Incoming_msg, msg.text)
+			m.messages = append(m.messages, msg.text)
+		} else {
+			m.warning = fmt.Sprintf("New message from @%s", sender)
+		}
+
+		return m, waitForDirectEvent()
+
+	case directMsgErrorMsg:
+		m.warning = msg.text
+		return m, nil
+
+	case directMsgConnectionClosedMsg:
+		m.warning = msg.text
+		m.conn = nil
+		m.readerStarted = false
+		return m, nil
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
@@ -67,7 +185,34 @@ func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+y", "ctrl+Y":
 			m.glitchmode = !m.glitchmode
 		case "enter":
-			// Your enter logic
+			text := strings.TrimSpace(m.textInput.Value())
+			if text == "" {
+				return m, cmd
+			}
+
+			if m.FriendtoMsg == "" {
+				m.warning = "No friend selected."
+				return m, cmd
+			}
+
+			if m.conn == nil {
+				m.warning = "Chat socket is offline."
+				return m, cmd
+			}
+
+			wireMsg := fmt.Sprintf("tusr:%s:user:%s", m.FriendtoMsg, text)
+			if err := m.conn.WriteMessage(websocket.TextMessage, []byte(wireMsg)); err != nil {
+				m.warning = fmt.Sprintf("Failed to send message: %v", err)
+				m.conn = nil
+				m.readerStarted = false
+				return m, cmd
+			}
+
+			rendered := fmt.Sprintf("[ me ] : %s", text)
+			m.my_msg = append(m.my_msg, rendered)
+			m.messages = append(m.messages, rendered)
+			m.textInput.SetValue("")
+			m.warning = ""
 		}
 
 	case tickMsg:
@@ -153,12 +298,36 @@ func (m DirectMsgView) View() string {
 		warningRender = warnStyle.Render(m.warning)
 	}
 
+	messagesBox := lipgloss.NewStyle().
+		Width(width-6).
+		Height(WinSize.Height-10).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(themeColor)).
+		Padding(1, 2)
+
+	var chatBody string
+	if len(m.messages) == 0 {
+		chatBody = "No messages yet."
+	} else {
+		start := 0
+		maxVisible := WinSize.Height - 14
+		if maxVisible < 1 {
+			maxVisible = 1
+		}
+		if len(m.messages) > maxVisible {
+			start = len(m.messages) - maxVisible
+		}
+		chatBody = strings.Join(m.messages[start:], "\n")
+	}
+
+	messageHistory := messagesBox.Render(chatBody)
+
 	// Get actual heights
 	// hH := lipgloss.Height(headerBar)
 	// cH := lipgloss.Height(Chatbox)
 
 	// Subtract an extra 2 lines just to be safe from terminal rounding errors
-	spacerHeight := WinSize.Height - 6 - lipgloss.Height(headerBar) - lipgloss.Height(Chatbox)
+	spacerHeight := WinSize.Height - 8 - lipgloss.Height(headerBar) - lipgloss.Height(Chatbox) - lipgloss.Height(messageHistory)
 
 	if spacerHeight < 0 {
 		spacerHeight = 0
@@ -170,6 +339,7 @@ func (m DirectMsgView) View() string {
 	centerContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		headerBar,
+		messageHistory,
 		spacere, // Pushes everything below it to the bottom
 		warningRender,
 		Chatbox,
