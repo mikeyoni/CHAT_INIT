@@ -87,8 +87,8 @@ func connectDirectSocket() tea.Cmd {
 			return directMsgErrorMsg{text: "Missing user token."}
 		}
 
-		url := fmt.Sprintf("ws://localhost:4040/chat?user=%s&token=%s", myuser, mytoken)
-		conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+		url := fmt.Sprintf("%s?user=%s&token=%s", websocketURL(), myuser, mytoken)
+		conn, _, err := wsDialer.Dial(url, nil)
 		if err != nil {
 			return directMsgErrorMsg{text: fmt.Sprintf("Failed to connect chat socket: %v", err)}
 		}
@@ -210,7 +210,7 @@ func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tickMsg:
-		m.colorstep = (m.colorstep + 5) % 1530
+		m.colorstep = currentAnimationStep()
 		return m, tea.Batch(tick(), cmd)
 	}
 
