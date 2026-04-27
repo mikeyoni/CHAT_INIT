@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -199,6 +200,42 @@ func sentOPTEmail(targetEmail string, otp string) error {
 	}
 	return nil
 
+}
+
+func serverAddress() string {
+	addr := strings.TrimSpace(os.Getenv("SERVER_ADDR"))
+	if addr == "" {
+		return ":4040"
+	}
+	return addr
+}
+
+func tlsEnabled() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("TLS_ENABLED")), "true")
+}
+
+func tlsCertFile() string {
+	return strings.TrimSpace(os.Getenv("TLS_CERT_FILE"))
+}
+
+func tlsKeyFile() string {
+	return strings.TrimSpace(os.Getenv("TLS_KEY_FILE"))
+}
+
+func buildServer() *http.Server {
+	server := &http.Server{
+		Addr:              serverAddress(),
+		Handler:           nil,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	if tlsEnabled() {
+		server.TLSConfig = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
+	}
+
+	return server
 }
 
 // json file read
@@ -1082,10 +1119,25 @@ func main() {
 	// this the last stage and the biginig of the server the code will be stay here in a loop and the server will be start
 	fmt.Printf("%s", oktext.Render("\n ( CTRL + C ) TO STOP THE SRVER <3 \n\n"))
 
-	if err := http.ListenAndServe(":4040", nil); err != nil {
+	server := buildServer()
+	if tlsEnabled() {
+		certFile := tlsCertFile()
+		keyFile := tlsKeyFile()
+		if certFile == "" || keyFile == "" {
+			fmt.Println(" TLS is enabled but TLS_CERT_FILE or TLS_KEY_FILE is missing ")
+			return
+		}
 
+		fmt.Printf("%s", oktext.Render(fmt.Sprintf("\n HTTPS server listening on %s \n", server.Addr)))
+		if err := server.ListenAndServeTLS(certFile, keyFile); err != nil {
+			fmt.Println(" local Fort 4040 is unusebal right this moment ! ", err)
+		}
+		return
+	}
+
+	fmt.Printf("%s", oktext.Render(fmt.Sprintf("\n HTTP server listening on %s \n", server.Addr)))
+	if err := server.ListenAndServe(); err != nil {
 		fmt.Println(" local Fort 4040 is unusebal right this moment ! ", err)
-
 	}
 
 }
