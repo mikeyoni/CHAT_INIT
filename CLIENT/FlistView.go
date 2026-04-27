@@ -1,7 +1,7 @@
 package main
 
 import (
-	"time"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -16,9 +16,8 @@ type FriendlistView struct {
 	friends []string
 	cursor  int
 	// Universal items
-	warning   string
-	active    bool
-	startTime time.Time
+	warning string
+	active  bool
 }
 
 func (m FriendlistView) Init() tea.Cmd {
@@ -36,7 +35,6 @@ func (m FriendlistView) Init() tea.Cmd {
 
 func NewFriendlist() FriendlistView {
 	fl := FriendlistView{
-		startTime: time.Now(),
 		friends: []string{
 			"Mikey [Online]",
 			"Pirate_King [Away]",
@@ -81,26 +79,13 @@ func (m FriendlistView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 			}
 
-		case "i", "I", "tab":
-			cycleThemeColor()
-			applySharedTheme(&m.currentcolor, &m.animetedcolor)
-
-		case "g", "G":
-			toggleAnimatedColor()
-			applySharedTheme(&m.currentcolor, &m.animetedcolor)
-
 		case "y", "Y":
 			m.glitchmode = !m.glitchmode
 
 		}
 
 	case tickMsg:
-		// Convert to float first, then multiply, then back to int
-		elapsed := time.Since(m.startTime).Milliseconds()
-
-		// We use a larger multiplier if it's too slow, or check the math
-		m.colorstep = int(float64(elapsed)*0.29) % 1530
-
+		m.colorstep = currentAnimationStep()
 		return m, tick()
 
 	}
@@ -108,55 +93,51 @@ func (m FriendlistView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m FriendlistView) View() string {
-
-	width := WinSize.Width
-
-	var render string
+	_, _, contentWidth, contentHeight := frameDimensions()
 	var warningRender string
 	applySharedTheme(&m.currentcolor, &m.animetedcolor)
 	themeColor := currentThemeColorHex(m.colorstep)
-
-	Versions := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Right).
-		Foreground(lipgloss.Color(themeColor))
-
-	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).
-		BorderForeground(lipgloss.Color(themeColor)).
-		Width(width-4).Padding(0, 0).Align(lipgloss.Center)
-
-	var l string
-	l = currentThemeGradientText("FRIENDS", m.colorstep, m.glitchmode)
-
-	// Friend list rendering
-	var listContent string
-	for i, friend := range m.friends {
-		if m.cursor == i {
-			listContent += lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).Bold(true).Render("> "+friend) + "\n"
-		} else {
-			listContent += "  " + friend + "\n"
-		}
+	rows := []string{}
+	visibleRows := clamp(contentHeight-4, 5, 10)
+	start := 0
+	if len(m.friends) > visibleRows {
+		start = clamp(m.cursor-(visibleRows/2), 0, len(m.friends)-visibleRows)
 	}
+	end := clamp(start+visibleRows, 0, len(m.friends))
 
-	Footther := lipgloss.NewStyle().Width(width - 10).Bold(true).
-		Foreground(lipgloss.Color("rgb(0, 0, 0)"))
+	for i, friend := range m.friends {
+		if i < start || i >= end {
+			continue
+		}
+		rows = append(rows, listRow(friend, "", m.cursor == i, contentWidth-4, themeColor))
+	}
 
 	if m.warning != "" {
 		warningRender = warnStyle.Render(m.warning)
 	}
 
-	Shortcut := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Left).
-		Foreground(lipgloss.Color("#ffffff9b"))
+	listContent := "No items."
+	if len(rows) > 0 {
+		listContent = strings.Join(rows, "\n")
+	}
 
-	centerContent := lipgloss.JoinVertical(
-		lipgloss.Center,
-		l,
-		"\n",
-		listContent,
-		render,
-		warningRender, "\n",
+	body := lipgloss.JoinVertical(
+		lipgloss.Left,
+		screenWordmark(themeColor, m.colorstep, m.glitchmode),
+		"",
+		panelTitleWithBody("Friend Manager", listContent, contentWidth, clamp(contentHeight-4, 10, 18), themeColor),
 	)
 
-	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit < 'I' & 'G' "), Versions.Render("v.1.02"))
-	v := boxrender.Render(centerContent)
+	if warningRender != "" {
+		body = lipgloss.JoinVertical(lipgloss.Left, body, "", warningRender)
+	}
 
-	return v
+	body = lipgloss.JoinVertical(
+		lipgloss.Left,
+		body,
+		"",
+		footerLine(contentWidth, "esc back   q quit", "v1.02"),
+	)
+
+	return renderScreen(themeColor, body)
 }
