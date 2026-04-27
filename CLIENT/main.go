@@ -3,11 +3,13 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"image/color"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strconv"
@@ -37,6 +39,60 @@ func exit() {
 
 var baseURL string
 var twidth int
+var apiClient *http.Client
+var wsDialer *websocket.Dialer
+
+func insecureLocalTLS() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("INSECURE_LOCAL_TLS")), "true")
+}
+
+func defaultServerURL() string {
+	if configured := strings.TrimSpace(os.Getenv("SERVER_URL")); configured != "" {
+		return configured
+	}
+	if insecureLocalTLS() {
+		return "https://localhost:4040"
+	}
+	return "http://localhost:4040"
+}
+
+func buildAPIClient() *http.Client {
+	transport := &http.Transport{}
+	if insecureLocalTLS() {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	return &http.Client{Transport: transport}
+}
+
+func buildWSDialer() *websocket.Dialer {
+	dialer := websocket.DefaultDialer
+	if insecureLocalTLS() {
+		copyDialer := *websocket.DefaultDialer
+		copyDialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		dialer = &copyDialer
+	}
+	return dialer
+}
+
+func httpPost(target string, contentType string, body io.Reader) (*http.Response, error) {
+	return apiClient.Post(target, contentType, body)
+}
+
+func websocketURL() string {
+	parsed, err := url.Parse(baseURL)
+	if err != nil {
+		return "ws://localhost:4040/chat"
+	}
+	if parsed.Scheme == "https" {
+		parsed.Scheme = "wss"
+	} else {
+		parsed.Scheme = "ws"
+	}
+	parsed.Path = "/chat"
+	parsed.RawQuery = ""
+	return parsed.String()
+}
+
 var (
 	userpromptStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00FFFF")).
@@ -149,7 +205,7 @@ func login(url string, username string, password string) (bool, string) {
 	}
 
 	jsondata, _ := json.Marshal(data)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsondata))
+	resp, err := httpPost(url, "application/json", bytes.NewBuffer(jsondata))
 
 	if err != nil {
 		return false, "Network Problem Faild To Canect To Server !"
@@ -196,7 +252,7 @@ func emailcheck(url string, email string, username string, password string) (boo
 		return false, waring
 	}
 
-	resp, err := http.Post(urle, "application/json-data", bytes.NewBuffer(jsondata))
+	resp, err := httpPost(urle, "application/json-data", bytes.NewBuffer(jsondata))
 
 	if err != nil {
 
@@ -251,7 +307,7 @@ func register(url string, email string, username string, password string) bool {
 
 		return false
 	}
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsondata))
+	resp, err := httpPost(url, "application/json", bytes.NewBuffer(jsondata))
 
 	if err != nil {
 
@@ -290,7 +346,7 @@ func sentforgetpassreq(email string) bool {
 	data := map[string]string{"email": email}
 	jsondata, _ := json.Marshal(data)
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsondata))
+	resp, err := httpPost(url, "application/json", bytes.NewBuffer(jsondata))
 	if err != nil {
 		return false
 	}
@@ -313,7 +369,7 @@ func (m LoginPageView) forgetpass(newpass string) bool {
 
 	resetURL := fmt.Sprintf("%s/forgetpass?otp=%s&user=%s&new=%s", baseURL, otpInput, m.email, newPassInput)
 
-	resp2, err := http.Post(resetURL, "application/json", nil)
+	resp2, err := httpPost(resetURL, "application/json", nil)
 	if err != nil {
 		return false
 	}
@@ -348,9 +404,9 @@ func savecradenshial(username string, tokeen string) {
 
 func chate(tusr string, token string, user string) {
 
-	url := fmt.Sprintf("ws://localhost:4040/chat?user=%s&token=%s", user, token)
+	url := fmt.Sprintf("%s?user=%s&token=%s", websocketURL(), user, token)
 
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	conn, _, err := wsDialer.Dial(url, nil)
 
 	if err != nil {
 		msg := fmt.Sprintf("\n handshake faild : %v ", err)
@@ -442,7 +498,7 @@ func todo(url, token string, user string, action string, targetuser string) {
 
 	Url := fmt.Sprintf("%s/do?user=%s&token=%s&act=%s&tar=%s", url, user, token, act, targetuser)
 
-	resp, err := http.Post(Url, "application/json", nil)
+	resp, err := httpPost(Url, "application/json", nil)
 
 	if err != nil {
 		fmt.Printf("\n Failed to send friend request: %v", err)
@@ -565,7 +621,7 @@ func tokenchekcing(url string) bool {
 
 	url = fmt.Sprintf("%v/checking?token=%s", url, mytoken)
 
-	resp, err := http.Post(url, "application/checking", nil)
+	resp, err := httpPost(url, "application/checking", nil)
 
 	if err != nil {
 		return false
@@ -595,7 +651,7 @@ func viewflist(url string) []string {
 
 	url = fmt.Sprintf("%v/viewflist?token=%v&user=%v", url, mytoken, myuser)
 
-	resp, err := http.Post(url, "aplication/flistreq", nil)
+	resp, err := httpPost(url, "aplication/flistreq", nil)
 
 	if err != nil {
 		return nil
@@ -620,7 +676,7 @@ func viewReqlist(url string) []string {
 
 	url = fmt.Sprintf("%v/viewReqlist?token=%v&user=%v", url, mytoken, myuser)
 
-	resp, err := http.Post(url, "aplication/Rlistreq", nil)
+	resp, err := httpPost(url, "aplication/Rlistreq", nil)
 
 	if err != nil {
 		return nil
@@ -645,7 +701,7 @@ func viewOnlineFriends(url string) []string {
 
 	url = fmt.Sprintf("%v/viewonlinefriends?token=%v&user=%v", url, mytoken, myuser)
 
-	resp, err := http.Post(url, "aplication/onlineflistreq", nil)
+	resp, err := httpPost(url, "aplication/onlineflistreq", nil)
 
 	if err != nil {
 		return nil
@@ -972,7 +1028,7 @@ func (m LoginPageView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case tickMsg:
-		m.colorstep = (m.colorstep + 5) % 1530
+		m.colorstep = currentAnimationStep()
 		return m, tick()
 
 	case tea.KeyMsg:
@@ -1168,7 +1224,7 @@ func (m LoginPageView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, func() tea.Msg {
 						// Build the URL manually here to ensure it's clean
 						resetURL := fmt.Sprintf("%s/forgetpass?otp=%s&user=%s&new=%s", baseURL, otp, email, newPass)
-						resp, err := http.Post(resetURL, "application/json", nil)
+						resp, err := httpPost(resetURL, "application/json", nil)
 
 						if err != nil {
 							return forgetResultMsg{success: false}
@@ -1493,7 +1549,9 @@ func (m LoginPageView) View() string {
 // this is where things starts
 func main() {
 
-	baseURL = "http://localhost:4040"
+	baseURL = defaultServerURL()
+	apiClient = buildAPIClient()
+	wsDialer = buildWSDialer()
 
 	// Try to load. If it fails (file deleted), mytoken/myuser will stay empty ""
 	godotenv.Load(".env")
