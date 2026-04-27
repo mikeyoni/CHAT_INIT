@@ -344,6 +344,25 @@ func friendlistview(user string) []string {
 	return nil
 }
 
+func onlinefriendlist(username string) []string {
+	friendlist := friendlistview(username)
+	if len(friendlist) == 0 {
+		return nil
+	}
+
+	clientMu.Lock()
+	defer clientMu.Unlock()
+
+	var online []string
+	for _, friend := range friendlist {
+		if _, ok := client[friend]; ok {
+			online = append(online, friend)
+		}
+	}
+
+	return online
+}
+
 // this return u the requestedlist slice
 func requestedlistview(user string) []string {
 
@@ -996,6 +1015,34 @@ func GIveReqlist(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func GiveOnlineFriends(w http.ResponseWriter, r *http.Request) {
+
+	user := r.URL.Query().Get("user")
+	token := r.URL.Query().Get("token")
+
+	if user == "" || token == "" {
+		return
+	}
+
+	if !tokencheck(token) {
+		return
+	}
+
+	onlinefriends := onlinefriendlist(user)
+	if onlinefriends == nil {
+		onlinefriends = []string{}
+	}
+
+	jsondata, err := json.Marshal(onlinefriends)
+	if err != nil {
+		fmt.Printf("\n Data marsheling proble : %v ", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsondata)
+}
+
 func main() {
 
 	// addfriend("dra34ken" , "mikey3")
@@ -1023,6 +1070,7 @@ func main() {
 	http.HandleFunc("/checking", checktoken)
 	http.HandleFunc("/viewflist", flistgiver)
 	http.HandleFunc("/viewReqlist", GIveReqlist)
+	http.HandleFunc("/viewonlinefriends", GiveOnlineFriends)
 
 	// http.HandleFunc("/chat-init" , long)
 
