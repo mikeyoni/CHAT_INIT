@@ -641,6 +641,31 @@ func viewReqlist(url string) []string {
 	return Rlist
 }
 
+func viewOnlineFriends(url string) []string {
+
+	url = fmt.Sprintf("%v/viewonlinefriends?token=%v&user=%v", url, mytoken, myuser)
+
+	resp, err := http.Post(url, "aplication/onlineflistreq", nil)
+
+	if err != nil {
+		return nil
+	}
+
+	defer resp.Body.Close()
+
+	serverbytes, _ := io.ReadAll(resp.Body)
+
+	var onlineFriends []string
+
+	err = json.Unmarshal(serverbytes, &onlineFriends)
+
+	if err != nil {
+		return nil
+	}
+
+	return onlineFriends
+}
+
 var Reqlist []string
 
 type seasionState int
@@ -677,6 +702,9 @@ var WinSize = struct {
 type SwitchToSettingsMsg struct{}
 type SwitchToFriendMsg struct{}
 type SwitchToDashMsg struct{}
+type SwitchToDirectMsgMsg struct {
+	Friend string
+}
 
 func SwitchToSettings() tea.Cmd {
 	return func() tea.Msg {
@@ -696,6 +724,12 @@ func SwitchtoFriend() tea.Cmd {
 	}
 }
 
+func SwitchtoDirectMsg(friend string) tea.Cmd {
+	return func() tea.Msg {
+		return SwitchToDirectMsgMsg{Friend: friend}
+	}
+}
+
 func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var newModel tea.Model
@@ -710,8 +744,8 @@ func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !m.islogedin && m.loginAttampt < 3 {
 		if tokenchekcing(baseURL) {
 			m.islogedin = true
-			m.state = DirectMsgState
-			return m, m.directmsg.Init()
+			m.state = DashState
+			return m, m.dash.Init()
 		}
 	}
 
@@ -735,6 +769,13 @@ func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.(type) {
+	case directMsgConnectedMsg, directMsgReceivedMsg, directMsgErrorMsg, directMsgConnectionClosedMsg:
+		newModel, cmd = m.directmsg.Update(msg)
+		m.directmsg = newModel.(DirectMsgView)
+		return m, cmd
+	}
+
+	switch msg.(type) {
 	case SwitchToSettingsMsg:
 		m.state = SettingState
 		return m, m.settings.Init()
@@ -746,6 +787,16 @@ func (m rootModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SwitchToFriendMsg:
 		m.state = FriendlistState
 		return m, m.friendlist.Init()
+
+	case SwitchToDirectMsgMsg:
+		directMsg := msg.(SwitchToDirectMsgMsg)
+		existingConn := m.directmsg.conn
+		readerStarted := m.directmsg.readerStarted
+		m.directmsg = NewDirectMsg(directMsg.Friend)
+		m.directmsg.conn = existingConn
+		m.directmsg.readerStarted = readerStarted
+		m.state = DirectMsgState
+		return m, m.directmsg.Init()
 
 	}
 	// 4. ROUTING (The rest stays exactly the same)
@@ -1599,7 +1650,7 @@ func main() {
 		friendlist: NewFriendlist(),
 		dash:       NewDashboard(),
 		settings:   NewSettings(),
-		directmsg:  NewDirectMsg(),
+		directmsg:  NewDirectMsg(""),
 	}
 
 	p := tea.NewProgram(m, tea.WithAltScreen()) // Use Altscreen for a "clean" look
