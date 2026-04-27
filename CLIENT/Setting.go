@@ -1,7 +1,7 @@
 package main
 
 import (
-	"time"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -12,12 +12,12 @@ type SettingsView struct {
 	animetedcolor bool
 	colorstep     int
 	glitchmode    bool
+	returnToLogin bool
 	// Settings specific
 	cursor int
 	// Universal items
-	warning   string
-	active    bool
-	startTime time.Time
+	warning string
+	active  bool
 }
 
 func (m SettingsView) Init() tea.Cmd {
@@ -25,9 +25,7 @@ func (m SettingsView) Init() tea.Cmd {
 }
 
 func NewSettings() SettingsView {
-	s := SettingsView{
-		startTime: time.Now(),
-	}
+	s := SettingsView{}
 
 	applySharedTheme(&s.currentcolor, &s.animetedcolor)
 	return s
@@ -43,6 +41,9 @@ func (m SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "esc":
 			m.active = false
+			if m.returnToLogin {
+				return m, SwitchtoLogin()
+			}
 			return m, SwitchtoDash()
 
 		case "ctrl+c":
@@ -65,26 +66,27 @@ func (m SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursor = 0
 			}
 
-		case "i", "I", "tab":
-			cycleThemeColor()
-			applySharedTheme(&m.currentcolor, &m.animetedcolor)
-
-		case "g", "G":
-			toggleAnimatedColor()
-			applySharedTheme(&m.currentcolor, &m.animetedcolor)
-
 		case "y", "Y":
 			m.glitchmode = !m.glitchmode
+
+		case "enter":
+			switch m.cursor {
+			case 0:
+				cycleThemeColor()
+				applySharedTheme(&m.currentcolor, &m.animetedcolor)
+			case 1:
+				toggleAnimatedColor()
+				applySharedTheme(&m.currentcolor, &m.animetedcolor)
+			case 2:
+				if m.returnToLogin {
+					return m, SwitchtoLogin()
+				}
+				return m, SwitchtoDash()
+			}
 		}
 
 	case tickMsg:
-
-		// Convert to float first, then multiply, then back to int
-		elapsed := time.Since(m.startTime).Milliseconds()
-
-		// We use a larger multiplier if it's too slow, or check the math
-		m.colorstep = int(float64(elapsed)*0.29) % 1530
-
+		m.colorstep = currentAnimationStep()
 		return m, tick()
 
 	}
@@ -92,59 +94,44 @@ func (m SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m SettingsView) View() string {
-
-	width := WinSize.Width
-
-	var render string
+	_, _, contentWidth, contentHeight := frameDimensions()
 	var warningRender string
 	applySharedTheme(&m.currentcolor, &m.animetedcolor)
 	themeColor := currentThemeColorHex(m.colorstep)
-
-	Versions := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Right).
-		Foreground(lipgloss.Color(themeColor))
-
-	var boxrender = lipgloss.NewStyle().Border(lipgloss.ThickBorder()).
-		BorderForeground(lipgloss.Color(themeColor)).
-		Width(width-4).Padding(0, 0).Align(lipgloss.Center)
-
-	// Settings Content logic
-	settingsTitle := lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).Bold(true).Render(" --- SETTINGS MENU --- ")
-
-	menuItems := []string{"1. Profile Config", "2. Network Settings", "3. System UI"}
-	var menuRender string
-	for i, item := range menuItems {
-		if m.cursor == i {
-			menuRender += lipgloss.NewStyle().Foreground(lipgloss.Color(themeColor)).Render("> "+item) + "\n"
-		} else {
-			menuRender += "  " + item + "\n"
-		}
+	menuItems := []string{
+		"Change Theme Color",
+		"Toggle Animated Color",
+		"Back",
 	}
-
-	var l string
-	l = currentThemeGradientText("SETTINGS", m.colorstep, m.glitchmode)
-
-	Footther := lipgloss.NewStyle().Width(width - 10).Bold(true).
-		Foreground(lipgloss.Color("rgb(0, 0, 0)"))
+	rows := []string{}
+	for i, item := range menuItems {
+		rows = append(rows, menuButton(item, m.cursor == i, clamp(contentWidth-4, 20, 40), themeColor))
+	}
 
 	if m.warning != "" {
 		warningRender = warnStyle.Render(m.warning)
 	}
 
-	Shortcut := lipgloss.NewStyle().Width((width - 11) / 2).Align(lipgloss.Left).
-		Foreground(lipgloss.Color("#ffffff9b"))
+	bodyText := strings.Join(rows, "\n\n") + "\n\n" + statusText("use enter to apply the selected option")
+	panelHeight := clamp(contentHeight-4, 10, 16)
 
-	centerContent := lipgloss.JoinVertical(
-		lipgloss.Center,
-		l,
-		settingsTitle,
-		"\n",
-		menuRender,
-		render,
-		warningRender, "\n",
+	body := lipgloss.JoinVertical(
+		lipgloss.Left,
+		screenWordmark(themeColor, m.colorstep, m.glitchmode),
+		"",
+		panelTitleWithBody("Settings", bodyText, contentWidth, panelHeight, themeColor),
 	)
 
-	centerContent += "\n" + Footther.Render(Shortcut.Render("'ESC' = Back 'Q' = Quit < 'I' & 'G' "), Versions.Render("v.1.02"))
-	v := boxrender.Render(centerContent)
+	if warningRender != "" {
+		body = lipgloss.JoinVertical(lipgloss.Left, body, "", warningRender)
+	}
 
-	return v
+	body = lipgloss.JoinVertical(
+		lipgloss.Left,
+		body,
+		"",
+		footerLine(contentWidth, "enter apply   esc back", "v1.02"),
+	)
+
+	return renderScreen(themeColor, body)
 }
