@@ -32,8 +32,8 @@ func NewDirectMsg() DirectMsgView {
 	ti.Placeholder = "Type a message..."
 	ti.Prompt = ""
 	ti.Focus()
-	ti.CharLimit = 156
-	ti.Width = 30
+	ti.CharLimit = 200
+	ti.Width = WinSize.Width - 9
 
 	dm := DirectMsgView{
 		textInput: ti,
@@ -58,13 +58,13 @@ func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			m.active = false
 			return m, SwitchtoDash()
-		case "i", "I", "tab":
+		case "ctrl+i", "ctrl+I", "tab":
 			cycleThemeColor()
 			applySharedTheme(&m.currentcolor, &m.animetedcolor)
-		case "g", "G":
+		case "ctrl+3", "ctrl+G":
 			toggleAnimatedColor()
 			applySharedTheme(&m.currentcolor, &m.animetedcolor)
-		case "y", "Y":
+		case "ctrl+y", "ctrl+Y":
 			m.glitchmode = !m.glitchmode
 		case "enter":
 			// Your enter logic
@@ -78,6 +78,7 @@ func (m DirectMsgView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// ok now htis is the 
 func (m DirectMsgView) View() string {
 
 	width := WinSize.Width
