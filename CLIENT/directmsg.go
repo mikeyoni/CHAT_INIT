@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"go/constant"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -59,6 +60,7 @@ func (m DirectMsgView) Init() tea.Cmd {
 
 	return tea.Batch(cmds...)
 }
+
 
 func NewDirectMsg(friend string) DirectMsgView {
 	ti := textinput.New()
