@@ -260,3 +260,5 @@ func (m DashboardView) View() string {
 
 	return renderScreen(themeColor, body)
 }
+
+// all done 
