@@ -5,5 +5,10 @@
     "editor.inlineSuggest.syntaxHighlightingEnabled": false,
     "editor.screenReaderAnnounceInlineSuggestion": false,
     "chat.disableAIFeatures": true,
-    "emmet.useInlineCompletions": true
+    "emmet.useInlineCompletions": true,
+    "editor.fontSize": 8,
+    "screencastMode.fontSize": 20,
+    "debug.console.fontSize": 9,
+    "scm.inputFontSize": 9,
+    "markdown.preview.fontSize": 9
 }
