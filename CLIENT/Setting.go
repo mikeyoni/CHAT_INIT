@@ -93,6 +93,8 @@ func (m SettingsView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// red next
+
 func (m SettingsView) View() string {
 	_, _, contentWidth, contentHeight := frameDimensions()
 	var warningRender string
